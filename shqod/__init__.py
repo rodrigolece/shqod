@@ -11,4 +11,5 @@ from .matrices import (
     od_matrix,
     reduce_matrix,
     calculate_field,
+    field_to_dict
 )

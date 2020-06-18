@@ -1,6 +1,6 @@
 """Main functions to build an OD matrix and calculate the field."""
 
-from typing import Iterable, Tuple
+from typing import Iterable, Tuple, Dict
 from .dtypes import LexTrajec
 
 import numpy as np
@@ -18,7 +18,7 @@ def od_matrix(lex_trajecs: Iterable[LexTrajec],
         The lexicographic trajectories to be used in counting the number of
         trips between locations.
     grid_size : int
-        The size of the grid in the level calculated as `width * height`.
+        The size of the grid in the level calculated as `width * length`.
 
     Returns
     -------
@@ -36,8 +36,10 @@ def od_matrix(lex_trajecs: Iterable[LexTrajec],
 
     # Remove diagonal entries
     out[np.diag_indices_from(out)] = 0
+    csr = out.tocsr()
+    csr.eliminate_zeros()
 
-    return out.tocsr()
+    return csr
 
 
 def reduce_matrix(square_mat: scipy.sparse.csr.csr_matrix,
@@ -114,3 +116,27 @@ def calculate_field(od_mat: scipy.sparse.csr.csr_matrix,
         Fs /= nb_trajecs
 
     return Xs, Fs
+
+
+def field_to_dict(Xs: np.array, Fs: np.array) -> Dict[Tuple, np.array]:
+    """Convert array summarising Field into dict.
+
+    Parameters
+    ----------
+    Xs : np.array
+        The array to use as keys (stores as rows).
+    Fs : np.array
+        The values of the field that will be dict values.
+
+    Returns
+    -------
+    Dict[Tuple, np.array]
+        A dictionary that is indixed by the values in Xs, and whose values are
+        the Fs.
+
+    """
+    out = dict()
+    for k in range(len(Xs)):
+        out[tuple(Xs[k])] = Fs[k]
+
+    return out

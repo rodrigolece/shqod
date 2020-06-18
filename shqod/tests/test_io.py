@@ -14,7 +14,7 @@ THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 class TestIO(unittest.TestCase):
-    """Test the function in the module io."""
+    """Test the functions in the module io."""
 
     def setUp(self):
         """To be executed before running the other tests."""
@@ -30,7 +30,7 @@ class TestIO(unittest.TestCase):
         self.n = n
 
     def test_load_trajecs(self):
-        """Test reading JSON input (one file for each trajectory)."""
+        """Load trajectories from JSON (one per file)."""
         trajec = load_trajecs(self.json_filenames)  # list of maps
         self.assertEqual(len(trajec), len(self.json_filenames))
         self.assertEqual(list(trajec[0]),
@@ -39,18 +39,18 @@ class TestIO(unittest.TestCase):
                          [(44, 10), (44, 11), (44, 11), (44, 11), (45, 11)])
 
     def test_load_trajecs_lex(self):
-        """Test reading JSON input (one file for each trajectory)."""
+        """Load lexicographic trajectories from JSON (one per file)."""
         trajec = load_trajecs_lex(self.json_filenames, self.grid_width)
         self.assertEqual(len(trajec), len(self.json_filenames))
         self.assertEqual(list(trajec[0]), [744, 744, 814, 814, 815])
         self.assertEqual(list(trajec[1]), [744, 814, 814, 814, 815])
 
     def test_read_trajec_csv(self):
-        """Test the reading function."""
+        """Read trajectories csv."""
         self.assertEqual(len(self.df), self.n)
 
     def test_trajecs_from_df(self):
-        """Test loading trajectories from a csv file with JSON."""
+        """Load trajectories from DataFrame."""
         trajec = trajecs_from_df(self.df, lexico=False)
         self.assertEqual(list(next(trajec)),
                          [(44, 10), (44, 10), (44, 11), (44, 11), (45, 11)])
@@ -58,7 +58,7 @@ class TestIO(unittest.TestCase):
                          [(44, 10), (44, 11), (44, 11), (44, 11), (45, 11)])
 
     def test_trajecs_from_df_lexico(self):
-        """Test loading trajectories from a csv file with JSON (lexicographic)."""
+        """Load lexicographic trajectories from DataFrame."""
         trajec = trajecs_from_df(self.df, lexico=True,
                                  grid_width=self.grid_width)
         self.assertEqual(list(next(trajec)), [744, 744, 814, 814, 815])
