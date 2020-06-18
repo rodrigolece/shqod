@@ -67,7 +67,7 @@ def trajecs_from_df(df: pd.DataFrame,
         data = json.loads(row.trajectory_data)['player']
 
         if lexico:
-            yield map(lambda el: el['x'] * grid_width + el['y'], data)
+            yield map(lambda el: el['y'] * grid_width + el['x'], data)
         else:
             yield map(lambda el: (el['x'], el['y']), data)
 
