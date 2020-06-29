@@ -4,6 +4,7 @@ from typing import Union, Optional, Tuple, List, Iterable
 from .dtypes import Trajec, LexTrajec
 
 import json
+import numpy as np
 import pandas as pd
 
 LoadedTrajec = Union[Iterable[Trajec], Iterable[LexTrajec]]
@@ -125,3 +126,32 @@ def load_trajecs_lex(files: List[str],
             out.append(trajec)
 
     return out
+
+
+def load_level_grid(filename: str) -> Tuple[np.array, np.array, int, int]:
+    """Short summary.
+
+    Parameters
+    ----------
+    filename : str
+        The name of the json file.
+
+    Returns
+    -------
+    Tuple[np.array, np.array, int, int]
+        The x, y coordinates of the landmass (for plotting set as on) and the
+        widht and length of the level.
+
+    """
+    assert filename.endswith('.json'), 'error: invalid file type'
+
+    with open(filename, 'r') as f:
+        data = json.loads(f.read())
+        assert 'fixed' in data.keys(), 'error: missing key `fixed`'
+        data = data['fixed']
+
+    width, length = data['grid_width'], data['grid_length']
+    grid = np.array(data['grid_data']).reshape((width, length), order='F')
+    x, y = grid.nonzero()
+
+    return x, y, width, length

@@ -1,15 +1,14 @@
 """Main functions to build an OD matrix and calculate the field."""
 
 from typing import Iterable, Tuple, Dict
-from .dtypes import LexTrajec
+from .dtypes import Trajec, LexTrajec
 
 import numpy as np
-import scipy
 import scipy.sparse as sp
 
 
 def od_matrix(lex_trajecs: Iterable[LexTrajec],
-              grid_size: int) -> scipy.sparse.csr.csr_matrix:
+              grid_size: int) -> sp.csr.csr_matrix:
     """Calculate the OD matrix from a set lexicographic trajectories.
 
     Parameters
@@ -22,7 +21,7 @@ def od_matrix(lex_trajecs: Iterable[LexTrajec],
 
     Returns
     -------
-    scipy.sparse.csr.csr_matrix
+    sp.csr.csr_matrix
         Origin-destination (OD) matrix.
 
     """
@@ -42,32 +41,33 @@ def od_matrix(lex_trajecs: Iterable[LexTrajec],
     return csr
 
 
-def reduce_matrix(square_mat: scipy.sparse.csr.csr_matrix,
-                  return_zeros: bool = False) -> scipy.sparse.csr.csr_matrix:
+def reduce_matrix(square_mat: sp.csr.csr_matrix,
+                  return_index: bool = False) -> sp.csr.csr_matrix:
     """Remove all rows and columns that are simultaneously empty.
 
     Parameters
     ----------
     square_mat : csr_matrix
         Input matrix.
-    return_zeros : bool
-        If True, also return the indices of `square_mat` that were removed.
+    return_index : bool
+        If True, also return the indices of `square_mat` that were kept.
 
     Returns
     -------
-    reduced_mat : csr_matrix
-        Description of returned object.
-    idx : ndarray, optional
+    reduced_mat : sp.csr_matrix
+        A square matrix that has the zero rows and columns removed.
+    idx : np.array, optional
+        The index of the rows and columns that were kept
 
     """
     i, j = square_mat.nonzero()
     idx = sorted(set(i).union(set(j)))  # sorted converts to list
     reduced_mat = square_mat[idx, :][:, idx]
 
-    return (reduced_mat, idx) if return_zeros else reduced_mat
+    return (reduced_mat, idx) if return_index else reduced_mat
 
 
-def calculate_field(od_mat: scipy.sparse.csr.csr_matrix,
+def calculate_field(od_mat: sp.csr.csr_matrix,
                     grid_width: int,
                     nb_trajecs: int = None) -> Tuple[np.array, np.array]:
     """Calculate the field at each location (origin) where it is non-zero.
@@ -140,3 +140,32 @@ def field_to_dict(Xs: np.array, Fs: np.array) -> Dict[Tuple, np.array]:
         out[tuple(Xs[k])] = Fs[k]
 
     return out
+
+
+def mobility_functional(trajec: Trajec,
+                        field: Dict[Tuple[int, int], np.array]) -> float:
+    """Short summary.
+
+    Parameters
+    ----------
+    trajec : Trajec
+        The (x, y) trajectory for which the functional is computed.
+    field : Dict[Tuple[int, int], np.array]
+        The mobility field used in the comparison.
+
+    Returns
+    -------
+    float
+        The mobility functional.
+
+    """
+    # TODO: define field dtype and put in .dtypes
+    out = 0.0
+    N = 0
+
+    for el in trajec:
+        Fi = field.get(tuple(el), np.zeros(2))
+        out += np.dot(Fi, el)
+        N += 1
+
+    return out / N

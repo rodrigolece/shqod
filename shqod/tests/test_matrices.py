@@ -63,6 +63,11 @@ class TestIO(unittest.TestCase):
     #
     #     self.assertEqual(calculate_field(), desired_out)
 
+    def test_mobility_funcitonal(self):
+        """Calculate a the mobility functional."""
+        # TODO: Fill test
+        pass
+
 
 if __name__ == '__main__':
     unittest.main()

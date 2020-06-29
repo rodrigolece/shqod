@@ -7,7 +7,8 @@ from shqod.io import (
     read_trajec_csv,
     trajecs_from_df,
     load_trajecs,
-    load_trajecs_lex
+    load_trajecs_lex,
+    load_level_grid
 )
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -28,6 +29,7 @@ class TestIO(unittest.TestCase):
         df, n = read_trajec_csv(self.csv_filename, return_length=True)
         self.df = df
         self.n = n
+        self.level_filename = os.path.join(THIS_DIR, 'testleveldata.json')
 
     def test_load_trajecs(self):
         """Load trajectories from JSON (one per file)."""
@@ -63,6 +65,13 @@ class TestIO(unittest.TestCase):
                                  grid_width=self.grid_width)
         self.assertEqual(list(next(trajec)), [744, 744, 814, 814, 815])
         self.assertEqual(list(next(trajec)), [744, 814, 814, 814, 815])
+
+    def test_load_level_grid(self):
+        """Load grid data."""
+        x, y, width, length = load_level_grid(self.level_filename)
+        self.assertEqual(width, 5)
+        self.assertEqual(length, 4)
+        self.assertEqual(len(x), 15)
 
 
 if __name__ == '__main__':
