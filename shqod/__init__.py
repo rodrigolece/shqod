@@ -3,9 +3,8 @@
 from .io import (
     read_trajec_csv,
     trajecs_from_df,
-    load_trajecs,
-    load_trajecs_lex,
-    load_level_grid
+    trajecs_from_files,
+    read_level_grid
 )
 
 from .matrices import (

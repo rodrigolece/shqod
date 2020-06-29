@@ -55,7 +55,8 @@ def trajecs_from_df(df: pd.DataFrame,
     -------
     Union[Iterable[Trajec], Iterable[LexTrajec]]
         Depending on the value set for the flag `lexico`, return a generator
-        with trajectories in the form of (x,y) coordinates or as a single index.
+        with trajectories in the form of (x,y) coordinates or as a single index:
+            i = grid_width * y + x
 
     """
     assert 'trajectory_data' in df,\
@@ -73,62 +74,43 @@ def trajecs_from_df(df: pd.DataFrame,
             yield map(lambda el: (el['x'], el['y']), data)
 
 
-def load_trajecs(files: Iterable[str]) -> List[Trajec]:
-    """Load trajectory JSON data as a generator containing coordinates of points.
+def trajecs_from_files(files: Iterable[str],
+                       lexico: bool = False,
+                       grid_width: int = None) -> LoadedTrajec:
+    """Parse trajectories from JSON files and return a generator.
 
     Parameters
     ----------
     files : List[str]
         The files to be loaded.
+    lexico : bool, optional
+        Use lexicographic indexing.
+    grid_width : int or None, optional
+        Provide the width of the grid and use it to calculate the lexicographic
+        index (defualt is None).
 
     Returns
     -------
-    List[Trajec]
-        It contains a list of trajectories as a series of (x,y) points.
-
-    """
-    out = []
-
-    for file in files:
-        with open(file, 'r') as f:
-            data = json.loads(f.read())
-            out.append(map(lambda el: (el['x'], el['y']), data['player']))
-
-    return out
-
-
-def load_trajecs_lex(files: List[str],
-                     grid_width: int) -> Iterable[LexTrajec]:
-    """Load trajectory JSON data as a generator containing lexicographic points.
-
-    Parameters
-    ----------
-    files : List[str]
-        The files to be loaded.
-    grid_width : int
-        The width of the grid in the level.
-
-    Returns
-    -------
-    Iterable[LexTrajec]
-        It contains a list of trajectories as a series of lexicographic indices,
-        where the coordinate index is given by
+    Union[Iterable[Trajec], Iterable[LexTrajec]]
+        Depending on the value set for the flag `lexico`, return a generator
+        with trajectories in the form of (x,y) coordinates or as a single index:
             i = grid_width * y + x
 
     """
-    out = []
+    if lexico:
+        assert grid_width is not None,\
+            'error: grid_width is needed for lexicographic trajectory'
 
     for file in files:
         with open(file, 'r') as f:
-            data = json.loads(f.read())
-            trajec = map(lambda el: el['y'] * grid_width + el['x'],
-                         data['player'])
-            out.append(trajec)
+            data = json.loads(f.read())['player']
+            if lexico:
+                yield map(lambda el: el['y'] * grid_width + el['x'], data)
+            else:
+                yield map(lambda el: (el['x'], el['y']), data)
 
-    return out
 
-
-def load_level_grid(filename: str) -> Tuple[np.array, np.array, int, int]:
+def read_level_grid(filename: str) -> Tuple[np.array, np.array, int, int]:
     """Short summary.
 
     Parameters
