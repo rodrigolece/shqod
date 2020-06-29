@@ -67,6 +67,10 @@ def trajecs_from_df(df: pd.DataFrame,
 
     for _, row in df.iterrows():
         data = json.loads(row.trajectory_data)['player']
+        if isinstance(data, dict):
+            # The trajectory is corrupted, the trajectory is a single point
+            # (and usually x is None)
+            continue
 
         if lexico:
             yield map(lambda el: el['y'] * grid_width + el['x'], data)
@@ -104,6 +108,11 @@ def trajecs_from_files(files: Iterable[str],
     for file in files:
         with open(file, 'r') as f:
             data = json.loads(f.read())['player']
+            if isinstance(data, dict):
+                # The trajectory is corrupted, the trajectory is a single point
+                # (and usually x is None)
+                continue
+
             if lexico:
                 yield map(lambda el: el['y'] * grid_width + el['x'], data)
             else:
