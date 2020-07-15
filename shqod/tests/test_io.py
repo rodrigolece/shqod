@@ -5,6 +5,7 @@ import os
 
 from shqod.io import (
     read_trajec_csv,
+    idx_last_attempt,
     trajecs_from_df,
     trajecs_from_files,
     read_level_grid
@@ -56,6 +57,9 @@ class TestIO(unittest.TestCase):
                          [(44, 10), (44, 10), (44, 11), (44, 11), (45, 11)])
         self.assertEqual(list(next(trajec)),
                          [(44, 10), (44, 11), (44, 11), (44, 11), (45, 11)])
+        # I've added a duplicated line (2nd attempt)
+        self.assertEqual(list(next(trajec)),
+                         [(44, 10), (44, 11), (44, 11), (44, 11), (45, 11)])
 
     def test_trajecs_from_df_lexico(self):
         """Load lexicographic trajectories from DataFrame."""
@@ -63,6 +67,14 @@ class TestIO(unittest.TestCase):
                                  grid_width=self.grid_width)
         self.assertEqual(list(next(trajec)), [744, 744, 814, 814, 815])
         self.assertEqual(list(next(trajec)), [744, 814, 814, 814, 815])
+        # I've added a duplicated line (2nd attempt)
+        self.assertEqual(list(next(trajec)), [744, 814, 814, 814, 815])
+
+    def test_idx_last_attempt(self):
+        """Test dropping all but last attempt for each player."""
+        idx = idx_last_attempt(self.df)
+        filtered_df = self.df.loc[idx]
+        self.assertEqual(len(filtered_df), len(self.df) - 1)
 
     def test_read_level_grid(self):
         """Read grid data."""

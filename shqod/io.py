@@ -25,7 +25,7 @@ def read_trajec_csv(filename: str,
     Returns
     -------
     Tuple[pd.DataFrame, Optional[int]]
-        The loaded datafram and optionally its length.
+        The loaded DataFrame and optionally its length.
 
     """
     df = pd.read_csv(filename)
@@ -33,6 +33,46 @@ def read_trajec_csv(filename: str,
     nb_entries = len(df)
 
     return (df, nb_entries) if return_length else df
+
+
+def idx_last_attempt(df: pd.DataFrame) -> pd.Series:
+    """Compute the index of the last attempt of each player.
+
+    For the computation, we first extract the number of previous attempts from
+    the JSON data, we group by `user_id` and we take the maximum index for each
+    group. Note that we use the function `idxmax` and therefore the coorect way
+    of filtering the original DataFrame is using the function `loc`.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        A DataFrame containing trajectory data and which has repeated attempts
+        per user.
+
+    Returns
+    -------
+    pd.Series
+        The index of the last attempts for each unique `user_id`.
+
+    Example
+    -------
+    >>> idx = idx_last_attempt(df)
+    >>> filtered_df = df.loc[idx]
+
+    """
+    assert 'trajectory_data' in df, 'error: DataFrame does not contain trajectory data'
+
+    # We compute a series containing the number of previous attempts
+    series = df.trajectory_data.apply(
+        lambda x: json.loads(x)['meta']['previous_attempts'])
+    series = series.rename('previous_attempts')
+
+    enlarged_df = pd.concat((df, series), axis=1)
+    idx = enlarged_df.groupby('user_id')['previous_attempts'].idxmax()
+    # NB: idxmax returns an index and the correct way of accessign the new df is using
+    # df.loc[idx]
+
+    return idx
 
 
 def trajecs_from_df(df: pd.DataFrame,
