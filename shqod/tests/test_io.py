@@ -5,7 +5,7 @@ import os
 
 from shqod.io import (
     read_trajec_csv,
-    idx_last_attempt,
+    duplicated_attempts,
     trajecs_from_df,
     trajecs_from_files,
     read_level_grid
@@ -70,9 +70,15 @@ class TestIO(unittest.TestCase):
         # I've added a duplicated line (2nd attempt)
         self.assertEqual(list(next(trajec)), [744, 814, 814, 814, 815])
 
-    def test_idx_last_attempt(self):
+    def test_duplicated_attempts_keep_first(self):
+        """Test dropping all but first attempt for each player."""
+        idx = duplicated_attempts(self.df, keep='first')
+        filtered_df = self.df.loc[idx]
+        self.assertEqual(len(filtered_df), len(self.df) - 1)
+
+    def test_duplicated_attempts_keep_last(self):
         """Test dropping all but last attempt for each player."""
-        idx = idx_last_attempt(self.df)
+        idx = duplicated_attempts(self.df, keep='last')
         filtered_df = self.df.loc[idx]
         self.assertEqual(len(filtered_df), len(self.df) - 1)
 

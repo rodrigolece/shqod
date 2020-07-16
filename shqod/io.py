@@ -35,7 +35,7 @@ def read_trajec_csv(filename: str,
     return (df, nb_entries) if return_length else df
 
 
-def idx_last_attempt(df: pd.DataFrame) -> pd.Series:
+def duplicated_attempts(df: pd.DataFrame, keep: str = 'first') -> pd.Series:
     """Compute the index of the last attempt of each player.
 
     For the computation, we first extract the number of previous attempts from
@@ -48,11 +48,14 @@ def idx_last_attempt(df: pd.DataFrame) -> pd.Series:
     df : pd.DataFrame
         A DataFrame containing trajectory data and which has repeated attempts
         per user.
+    keep : str, optional
+        Valid options are 'first' (the default) and 'last' to decide which
+        instance of the duplicated attempts to keep.
 
     Returns
     -------
     pd.Series
-        The index of the last attempts for each unique `user_id`.
+        The index of the unique attempts for each user.
 
     Example
     -------
@@ -61,6 +64,7 @@ def idx_last_attempt(df: pd.DataFrame) -> pd.Series:
 
     """
     assert 'trajectory_data' in df, 'error: DataFrame does not contain trajectory data'
+    assert keep in ('first', 'last'), f'error: invalid option {keep}'
 
     # We compute a series containing the number of previous attempts
     series = df.trajectory_data.apply(
@@ -68,9 +72,10 @@ def idx_last_attempt(df: pd.DataFrame) -> pd.Series:
     series = series.rename('previous_attempts')
 
     enlarged_df = pd.concat((df, series), axis=1)
-    idx = enlarged_df.groupby('user_id')['previous_attempts'].idxmax()
-    # NB: idxmax returns an index and the correct way of accessign the new df is using
-    # df.loc[idx]
+    gby = enlarged_df.groupby('user_id')['previous_attempts']
+    idx = gby.idxmin() if keep == 'first' else gby.idxmax()
+    # NB: idx{min,max} return an index and the correct way of accessing the new df
+    # is using df.loc[idx]
 
     return idx
 

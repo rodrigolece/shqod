@@ -2,7 +2,7 @@
 
 from .io import (
     read_trajec_csv,
-    idx_last_attempt,
+    duplicated_attempts,
     trajecs_from_df,
     trajecs_from_files,
     read_level_grid
