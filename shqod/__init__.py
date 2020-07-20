@@ -2,6 +2,7 @@
 
 from .io import (
     read_trajec_csv,
+    previous_attempts,
     duplicated_attempts,
     trajecs_from_df,
     trajecs_from_files,
@@ -15,3 +16,5 @@ from .matrices import (
     field_to_dict,
     mobility_functional
 )
+
+from .trajectories import fractalD, trajectory_length
