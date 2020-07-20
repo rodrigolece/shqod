@@ -35,13 +35,36 @@ def read_trajec_csv(filename: str,
     return (df, nb_entries) if return_length else df
 
 
+def previous_attempts(df: pd.DataFrame) -> pd.Series:
+    """Extract the number of previousattempts from the metadata.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        A DataFrame containing trajectory data and which has repeated attempts
+        per user.
+
+    Returns
+    -------
+    pd.Series
+        The number of previous attempts.
+
+    """
+    assert 'trajectory_data' in df, 'error: DataFrame does not contain trajectory data'
+    out = df.trajectory_data.apply(
+        lambda x: json.loads(x)['meta']['previous_attempts'])
+    out = out.rename('previous_attempts')
+
+    return out
+
+
 def duplicated_attempts(df: pd.DataFrame, keep: str = 'first') -> pd.Series:
     """Compute the index of the last attempt of each player.
 
     For the computation, we first extract the number of previous attempts from
-    the JSON data, we group by `user_id` and we take the maximum index for each
-    group. Note that we use the function `idxmax` and therefore the coorect way
-    of filtering the original DataFrame is using the function `loc`.
+    the JSON data, we group by `user_id` and we take the min/max index for each
+    group. Note that we use either of the functions `idx{min,max}` and therefore
+    the correct row selection should make use of the function `loc`.
 
     Parameters
     ----------
@@ -63,19 +86,16 @@ def duplicated_attempts(df: pd.DataFrame, keep: str = 'first') -> pd.Series:
     >>> filtered_df = df.loc[idx]
 
     """
-    assert 'trajectory_data' in df, 'error: DataFrame does not contain trajectory data'
+    assert 'trajectory_data' in df, \
+            'error: DataFrame does not contain trajectory data'
     assert keep in ('first', 'last'), f'error: invalid option {keep}'
 
-    # We compute a series containing the number of previous attempts
-    series = df.trajectory_data.apply(
-        lambda x: json.loads(x)['meta']['previous_attempts'])
-    series = series.rename('previous_attempts')
+    # the series containing the number of previous attempts
+    pa = previous_attempts(df)
 
-    enlarged_df = pd.concat((df, series), axis=1)
+    enlarged_df = pd.concat((df, pa), axis=1)
     gby = enlarged_df.groupby('user_id')['previous_attempts']
     idx = gby.idxmin() if keep == 'first' else gby.idxmax()
-    # NB: idx{min,max} return an index and the correct way of accessing the new df
-    # is using df.loc[idx]
 
     return idx
 
