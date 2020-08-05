@@ -184,13 +184,16 @@ def trajecs_from_files(files: Iterable[str],
                 yield map(lambda el: (el['x'], el['y']), data)
 
 
-def read_level_grid(filename: str) -> Tuple[np.array, np.array, int, int]:
+def read_level_grid(filename: str,
+                    return_flags: bool = False) -> Tuple[np.array, np.array, int, int]:
     """Short summary.
 
     Parameters
     ----------
     filename : str
         The name of the json file.
+    return_flags : bool, optional
+        Return the coordinates of the checkpoints (defualt is False).
 
     Returns
     -------
@@ -206,8 +209,9 @@ def read_level_grid(filename: str) -> Tuple[np.array, np.array, int, int]:
         assert 'fixed' in data.keys(), 'error: missing key `fixed`'
         data = data['fixed']
 
-    width, length = data['grid_width'], data['grid_length']
-    grid = np.array(data['grid_data']).reshape((width, length), order='F')
+    w, l = data['grid_width'], data['grid_length']
+    grid = np.array(data['grid_data']).reshape((w, l), order='F')
     x, y = grid.nonzero()
+    flag_coords = np.array([(d['x'], d['y']) for d in data['flags']])
 
-    return x, y, width, length
+    return (x, y, w, l, flag_coords) if return_flags else (x, y, w, l)
