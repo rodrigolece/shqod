@@ -143,15 +143,21 @@ def field_to_dict(Xs: np.array, Fs: np.array) -> Dict[Tuple, np.array]:
 
 
 def mobility_functional(trajec: Trajec,
-                        field: Dict[Tuple[int, int], np.array]) -> float:
+                        od_mat: sp.csr.csr_matrix,
+                        grid_width: int,
+                        nb_trajecs: int) -> float:
     """Short summary.
 
     Parameters
     ----------
     trajec : Trajec
         The (x, y) trajectory for which the functional is computed.
-    field : Dict[Tuple[int, int], np.array]
-        The mobility field used in the comparison.
+    od_mat : csr_matrix
+        The orgin-destination (OD) matrix to use as input.
+    grid_width : int
+        The width of the grid in the level.
+    nb_trajecs : int or None, optional
+        If provided, normalise the field by dividing by this number.
 
     Returns
     -------
@@ -159,9 +165,12 @@ def mobility_functional(trajec: Trajec,
         The mobility functional.
 
     """
-    # TODO: define field dtype and put in .dtypes
     out = 0.0
     N = 0
+
+    field = field_to_dict(
+        *calculate_field(od_mat, grid_width, nb_trajecs=nb_trajecs)
+    )
 
     for el in trajec:
         Fi = field.get(tuple(el), np.zeros(2))

@@ -44,7 +44,7 @@ def run_tests(filenames, mat, N, width, length):
     group_mats = [od_matrix([t], width * length) for t in lex_ts]
 
     norm_mat = mat/N
-    F_dict = field_to_dict(*calculate_field(mat, width, nb_trajecs=N))
+    # F_dict = field_to_dict(*calculate_field(mat, width, nb_trajecs=N))
 
     for i, m in enumerate(group_mats):
         # Matrix differences
@@ -56,7 +56,7 @@ def run_tests(filenames, mat, N, width, length):
         match = mat[r, s].sum() / (N*len(r))
 
         # Mobility functional
-        mob = mobility_functional(ts[i], F_dict)
+        mob = mobility_functional(ts[i], mat, width, N)
 
         # Fractal dimension
         d = fractalD(ts[i], width, length)
