@@ -20,14 +20,13 @@ from shqod import (
 
 project_dir = os.environ['dementia']  # set in the shell
 
-raw_dir = os.path.join(project_dir, 'data', 'raw', '')
-grids_dir = os.path.join(raw_dir, 'grids', '')
+grids_dir = os.path.join(project_dir, 'data', 'raw', 'grids', '')
 
 processed_dir = os.path.join(project_dir, 'data', 'processed', '')
 apoe_dir = os.path.join(project_dir, 'data', 'apoe')
-e3e4_dir = os.path.join(project_dir, 'data', 'apoe', 'e3e4')
-e3e3_dir = os.path.join(project_dir, 'data', 'apoe', 'e3e3')
-e4e4_dir = os.path.join(project_dir, 'data', 'apoe', 'e4e4')
+e3e4_dir = os.path.join(apoe_dir, 'e3e4')
+e3e3_dir = os.path.join(apoe_dir, 'e3e3')
+e4e4_dir = os.path.join(apoe_dir, 'e4e4')
 
 
 def run_tests(filenames, mat, N, width, length):
