@@ -11,6 +11,8 @@ from .io import (
 
 from .matrices import (
     od_matrix,
+    od_matrix_brokenup,
+    breakup_array_by_flags,
     reduce_matrix,
     calculate_field,
     field_to_dict,

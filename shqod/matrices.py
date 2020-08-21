@@ -1,10 +1,12 @@
 """Main functions to build an OD matrix and calculate the field."""
 
-from typing import Iterable, Tuple, Dict
+from typing import Iterable, List, Tuple, Dict
 from .dtypes import Trajec, LexTrajec
 
 import numpy as np
 import scipy.sparse as sp
+from itertools import groupby
+from operator import itemgetter
 
 
 def od_matrix(lex_trajecs: Iterable[LexTrajec],
@@ -39,6 +41,92 @@ def od_matrix(lex_trajecs: Iterable[LexTrajec],
     csr.eliminate_zeros()
 
     return csr
+
+
+def od_matrix_brokenup(trajecs: Iterable[Trajec],
+                       grid_size: Tuple[int, int],
+                       flags: np.array,
+                       R: float = 3) -> List[sp.csr.csr_matrix]:
+    """Calculate the OD matrices broken up by the visits to the checkpoints.
+
+    Parameters
+    ----------
+    trajecs : Iterable[Trajec]
+        The trajectories to be used in counting the number of
+        trips between locations.
+    grid_size : int
+        The size of the grid in the level calculated as `width * length`.
+    flags : np.array
+        The coordinates of the flags (ordered).
+    R : float
+        The radius to consider a checkpoint visited.
+
+    Returns
+    -------
+    List[sp.csr.csr_matrix]
+        List of origin-destination (OD) matrices.
+
+    """
+    N = len(flags)
+    width, length = grid_size
+    grid_size = width * length
+    out = [sp.lil_matrix((grid_size, grid_size), dtype=int)
+           for _ in range(N)]
+
+    for t in trajecs:
+        arr = np.array(list(t))
+        idx = breakup_array_by_flags(arr, flags, R=3)
+
+        for k, sub_arr in enumerate(np.split(arr, idx[:-1])):
+            lex = sub_arr[:, 1] * width + sub_arr[:, 0]
+
+            for i, j in zip(lex[:-1], lex[1:]):
+                out[k][i, j] += 1
+
+    # Remove diagonal entries
+    for k in range(N):
+        out[k][np.diag_indices_from(out[k])] = 0
+        out[k] = out[k].tocsr()
+        out[k].eliminate_zeros()
+
+    return out
+
+
+def breakup_array_by_flags(trajec: np.array,
+                           flags: np.array,
+                           R: float = 3) -> List[int]:
+    """Find the last index of the first passage by each flag.
+
+    Parameters
+    ----------
+    trajec : np.array
+        An array storing the trajectory.
+    flags : np.array
+        The coordinates of the flags (ordered).
+    R : float
+        The radius to consider a checkpoint visited.
+
+    Returns
+    -------
+    List[int]
+        The list with the indices that can be used to split `trajec`.
+
+    """
+    out = []
+    offset = 0
+
+    for f in flags:
+        idx = np.where(
+            np.linalg.norm(trajec[offset:] - f, 2, axis=1) <= R
+        )[0] + offset
+        max_sets = [
+            max(map(itemgetter(1), g))
+            for _, g in groupby(enumerate(idx), lambda ix: ix[0] - ix[1])
+        ]
+        offset = min(max_sets)
+        out.append(offset)
+
+    return out
 
 
 def reduce_matrix(square_mat: sp.csr.csr_matrix,
@@ -145,7 +233,8 @@ def field_to_dict(Xs: np.array, Fs: np.array) -> Dict[Tuple, np.array]:
 def mobility_functional(trajec: Trajec,
                         od_mat: sp.csr.csr_matrix,
                         grid_width: int,
-                        nb_trajecs: int) -> float:
+                        nb_trajecs: int,
+                        flags: np.array = None) -> float:
     """Short summary.
 
     Parameters
@@ -168,13 +257,30 @@ def mobility_functional(trajec: Trajec,
     out = 0.0
     N = 0
 
-    field = field_to_dict(
-        *calculate_field(od_mat, grid_width, nb_trajecs=nb_trajecs)
-    )
+    if isinstance(od_mat, list):
+        assert flags is not None, 'error: provide the coodinates of the flags'
+        field = [
+            field_to_dict(
+                *calculate_field(mat, grid_width, nb_trajecs=nb_trajecs)
+            ) for mat in od_mat]
 
-    for el in trajec:
-        Fi = field.get(tuple(el), np.zeros(2))
-        out += np.dot(Fi, el)
-        N += 1
+        arr = np.array(list(trajec))
+        idx = breakup_array_by_flags(arr, flags, R=3)
+
+        for k, sub_arr in enumerate(np.split(arr, idx[:-1])):
+            for el in sub_arr:
+                Fi = field[k].get(tuple(el), np.zeros(2))
+                out += np.dot(Fi, el)
+                N += 1
+
+    else:
+        field = field_to_dict(
+            *calculate_field(od_mat, grid_width, nb_trajecs=nb_trajecs)
+        )
+
+        for el in trajec:
+            Fi = field.get(tuple(el), np.zeros(2))
+            out += np.dot(Fi, el)
+            N += 1
 
     return out / N
