@@ -4,6 +4,7 @@ from typing import Union, Optional, Tuple, List, Iterable
 from .dtypes import Trajec, LexTrajec
 
 import json
+import collections
 import numpy as np
 import pandas as pd
 
@@ -100,6 +101,43 @@ def duplicated_attempts(df: pd.DataFrame, keep: str = 'first') -> pd.Series:
     return idx
 
 
+def trajec(data: str,
+           lexico: bool = False,
+           grid_width: int = None) -> Union[Trajec, LexTrajec]:
+    """
+    Parse JSON string and return an iterable with a single trajectory.
+
+    Parameters
+    ----------
+    data : str
+        The input data.
+    lexico : bool, optional
+        Use lexicographic indexing.
+    grid_width : int or None, optional
+        Provide the width of the grid and use it to calculate the lexicographic
+        index (defualt is None).
+
+    Returns
+    -------
+    Union[Trajec, LexTrajec]
+        Depending on the value set for the flag `lexico`, return a trajectory
+        in the form of (x,y) coordinates or a lexicographic index.
+
+    """
+    data = json.loads(data)['player']
+
+    if isinstance(data, dict):
+        # The trajectory is corrupted, the trajectory is a single point
+        # (and usually x is None)
+        out = None
+    elif lexico:
+        out = map(lambda el: el['y'] * grid_width + el['x'], data)
+    else:
+        out = map(lambda el: (el['x'], el['y']), data)
+
+    return out
+
+
 def trajecs_from_df(df: pd.DataFrame,
                     lexico: bool = False,
                     grid_width: int = None) -> LoadedTrajec:
@@ -131,16 +169,19 @@ def trajecs_from_df(df: pd.DataFrame,
             'error: grid_width is needed for lexicographic trajectory'
 
     for _, row in df.iterrows():
-        data = json.loads(row.trajectory_data)['player']
-        if isinstance(data, dict):
-            # The trajectory is corrupted, the trajectory is a single point
-            # (and usually x is None)
+        t = trajec(row.trajectory_data, lexico, grid_width)
+        if t is None:
             continue
-
-        if lexico:
-            yield map(lambda el: el['y'] * grid_width + el['x'], data)
         else:
-            yield map(lambda el: (el['x'], el['y']), data)
+            yield t
+
+
+def _get_iterable(x):
+    """Used to load either a single file or a list of files."""
+    if isinstance(x, collections.Iterable) and not isinstance(x, str):
+        return x
+    else:
+        return (x,)
 
 
 def trajecs_from_files(files: Iterable[str],
@@ -170,18 +211,13 @@ def trajecs_from_files(files: Iterable[str],
         assert grid_width is not None,\
             'error: grid_width is needed for lexicographic trajectory'
 
-    for file in files:
+    for file in _get_iterable(files):
         with open(file, 'r') as f:
-            data = json.loads(f.read())['player']
-            if isinstance(data, dict):
-                # The trajectory is corrupted, the trajectory is a single point
-                # (and usually x is None)
+            t = trajec(f.read(), lexico, grid_width)
+            if t is None:
                 continue
-
-            if lexico:
-                yield map(lambda el: el['y'] * grid_width + el['x'], data)
             else:
-                yield map(lambda el: (el['x'], el['y']), data)
+                yield t
 
 
 def read_level_grid(filename: str,

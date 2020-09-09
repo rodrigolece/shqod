@@ -1,13 +1,15 @@
 import os
 import argparse
-import string
+import itertools
+
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 from tqdm import tqdm
 
 from shqod import (
-    trajecs_from_files,
+    read_trajec_csv,
+    trajec,
     read_level_grid,
     od_matrix,
     calculate_field,
@@ -23,92 +25,146 @@ project_dir = os.environ['dementia']  # set in the shell
 grids_dir = os.path.join(project_dir, 'data', 'raw', 'grids', '')
 
 processed_dir = os.path.join(project_dir, 'data', 'processed', '')
-apoe_dir = os.path.join(project_dir, 'data', 'apoe')
-e3e4_dir = os.path.join(apoe_dir, 'e3e4')
-e3e3_dir = os.path.join(apoe_dir, 'e3e3')
-e4e4_dir = os.path.join(apoe_dir, 'e4e4')
+apoe_dir = os.path.join(project_dir, 'data', 'apoe', 'dataframes')
+# e3e4_dir = os.path.join(apoe_dir, 'e3e4')
+# e3e3_dir = os.path.join(apoe_dir, 'e3e3')
+# e4e4_dir = os.path.join(apoe_dir, 'e4e4')
 
 
-def run_tests(filenames, mat, N, width, length):
-    """Run the battery of 6 tests."""
+class NormativeBenchmark(object):
 
-    test_names = ['Frob. norm', 'Inf. norm', 'Restrict. sum',
-                  'Mobty functional', 'Fractal dim.', 'Tot. length']
+    def __init__(self,
+                 age_range: str,
+                 gender: str,
+                 od_matrix: sp.csr.csr_matrix,
+                 nb_trajecs: int,
+                 grid_width: int,
+                 grid_length: int,
+                 level: int = None,
+                 flags: np.array = None):
 
-    n = len(filenames)
-    out = np.ones((n, 6))
+        self.age_range = age_range
+        self.gender = gender
+        self.normative_mat = od_matrix
+        self.N = nb_trajecs
+        self.width = grid_width
+        self.length = grid_length
 
-    ts = [list(t) for t in trajecs_from_files(filenames, lexico=False)]
-    lex_ts = trajecs_from_files(filenames, lexico=True, grid_width=width)
-    group_mats = [od_matrix([t], width * length) for t in lex_ts]
+        if level:
+            self.level = level
 
-    norm_mat = mat/N
-    # F_dict = field_to_dict(*calculate_field(mat, width, nb_trajecs=N))
+        if flags:
+            self.flags = flags
 
-    for i, m in enumerate(group_mats):
-        # Matrix differences
-        fro = np.linalg.norm((norm_mat - m).toarray(), 'fro')
-        inf = np.linalg.norm((norm_mat - m).toarray(), np.inf)
+        self.test_names = [
+            'Frob. norm', 'Inf. norm', 'Restrict. sum',
+            'Mobty functional', 'Fractal dim.', 'Tot. length'
+        ]
+
+    def __str__(self):
+        return f'Normative bechmark - level {self.level} - {self.age_range} - {self.gender} (N={self.N})'
+
+    def test_trajectory(self, trajectory_data: str):
+        """Run the battery of 6 tests."""
+
+        t = list(trajec(trajectory_data, lexico=False))
+        lex = trajec(trajectory_data, lexico=True, grid_width=self.width)
+        od_mat = od_matrix([lex], self.width * self.length)
+
+        norm_mat = self.normative_mat / self.N
+
+        fro = np.linalg.norm((norm_mat - od_mat).toarray(), 'fro')
+        inf = np.linalg.norm((norm_mat - od_mat).toarray(), np.inf)
 
         # Sum of matching entries
-        r, s = m.nonzero()
-        match = mat[r, s].sum() / (N*len(r))
+        r, s = norm_mat.nonzero()
+        match = norm_mat[r, s].sum() / len(r)
 
         # Mobility functional
-        mob = mobility_functional(ts[i], mat, width, N)
+        mob = mobility_functional(t, self.normative_mat, self.width, self.N)
 
         # Fractal dimension
-        d = fractalD(ts[i], width, length)
+        dim = fractalD(t, self.width, self.length)
 
         # Total length
-        l = trajectory_length(ts[i])
+        lgt = trajectory_length(t)
 
-        out[i] = [fro, inf, match, mob, d, l]
-
-    return out, test_names
+        return [fro, inf, match, mob, dim, lgt]
 
 
-def level_tidy_df(group_dirs, level):
+def load_environments(levels, Rs):
+    """Load the normative benchmark environments."""
+
+    counts_df = pd.read_csv(processed_dir + 'uk_counts.csv')
+
+    out = dict()
+
+    for lvl in levels:
+        # Level width and length
+        filename_grid = grids_dir + f'level{lvl:02}.json'
+        _, _, width, length = read_level_grid(filename_grid)
+
+        # The table containing counts per level, age group and gender
+        lvl_counts_df = counts_df.loc[counts_df.level == lvl]
+
+        for age_range, gender in itertools.product(Rs, ['f', 'm']):
+            # The processed normative matrix
+            filename = os.path.join(
+                processed_dir,
+                f'level_{lvl}_uk_{age_range}_{gender}.npz'
+            )
+            norm_mat = sp.load_npz(filename)
+
+            # The nbr of entries for that age range and gender
+            age_counts = (lvl_counts_df
+                          .loc[counts_df.age_range == age_range]
+                          .set_index('gender')['counts']
+                          .to_dict())
+            N = age_counts[gender]
+
+            out[(lvl, age_range, gender)] = NormativeBenchmark(
+                age_range, gender, norm_mat, N, width, length, level=lvl
+            )
+
+    return out
+
+
+def group_tidy_df(filename, envs, Rs):
     """Load level data for several groups and run the tests."""
 
-    # Load the level dimensions 
-    _, _, width, length = read_level_grid(grids_dir + f'level{level:02}.json')
+    df = read_trajec_csv(filename)
+    levels = df.level.unique()
 
-    # Load the OD matrices combined for m/f and ages 51-70
-    Rs = ['5160', '6170']  # TODO: take the correct age ranges
-    N = 0
+    # We append the age range
+    df['age_range'] = (
+        df['age']
+        .apply(lambda x: x // 10)
+        .replace(dict(zip([int(x[0]) for x in Rs], Rs)))
+    )
 
-    L = width * length
-    mat = sp.csr_matrix((L, L))
+    # The test names are defined inside the environment object
+    test_names = envs[list(envs)[0]].test_names
 
-    for age_range in Rs:
-        # the nbr of entries in that age range
-        counts_df = pd.read_csv(processed_dir + 'uk_counts.csv')
-        idx = (counts_df.level == level) & (counts_df.age_range == age_range)
-        N += counts_df.loc[idx]['counts'].sum()
-
-        f = os.path.join(processed_dir, f'level_{level}_uk_{age_range}_f.npz')
-        m = os.path.join(processed_dir, f'level_{level}_uk_{age_range}_m.npz')
-        fmat = sp.load_npz(f)
-        mmat = sp.load_npz(m)
-
-        mat += fmat + mmat
-
-    # Load the trajectories for each group and calculate the results
     dfs = []
 
-    for i, d in enumerate(group_dirs):
-        filenames = [os.path.join(root, name)
-                     for root, dirs, files in os.walk(d)
-                     for name in files
-                     if name.startswith(f'level0{level:02}')]
+    for lvl in tqdm(levels):
 
-        res, test_names = run_tests(filenames, mat, N, width, length)
-        df = pd.DataFrame(res, columns=test_names)
-        df['group'] = string.ascii_uppercase[i]  # no more than 26 groups!
-        dfs.append(df)
+        lvl_df = df.loc[df.level == lvl].reset_index(drop=True)
+        results = np.ones((len(lvl_df), 6))
 
-    return pd.concat(dfs)
+        # Load the trajectories and calculate the results
+        for k, row in lvl_df.iterrows():
+            ar, g, data = row[['age_range', 'gender', 'trajectory_data']]
+            results[k] = envs[(lvl, ar, g)].test_trajectory(data)
+
+        res_df = pd.DataFrame(results, columns=test_names)
+        res_df['level'] = lvl
+        dfs.append(res_df)
+
+    # We keep original ids in the results df
+    out_df = pd.concat(dfs).join(df['id'])
+
+    return out_df[['id', 'level'] + test_names]
 
 
 if __name__ == '__main__':
@@ -124,20 +180,31 @@ if __name__ == '__main__':
     filename = args.output_file
     levels = args.levels
     # groups = args.groups
-    assert filename.endswith('.csv'), 'input should be csv file'
+    assert filename.endswith('.csv'), 'output should be csv file'
 
-    # below would be calculated using the name of the groups
-    # (i.e. we would use the names to cosntruct the dirs)
-    populations = (e3e4_dir, e3e3_dir, e4e4_dir)
+    # The three genetic groups of the apoe study
+    populations = [
+        os.path.join(apoe_dir, f)
+        for f in os.listdir(apoe_dir)
+    ]
+
+    # We know beforehand the age ranges for the participants of the study
+    Rs = ['5160', '6170', '71plus']
+
+    envs = load_environments(levels, Rs)
+
     dfs = []
 
-    print('Calculating level results')
-    for l in tqdm(levels):
-        df = level_tidy_df(populations, l)
-        df['level'] = l
+    for group in populations:
+        name = os.path.basename(group).replace('apoe_', '').replace('.csv', '')
+        print(f'Current group is: {name}')
+
+        df = group_tidy_df(group, envs, Rs)
+        df['group'] = name
         dfs.append(df)
+        print()
 
     tidy_df = pd.concat(dfs)
     tidy_df.to_csv(filename, index=False)
 
-    print('\nDone!\n')
+    print('Done!\n')

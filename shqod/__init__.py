@@ -4,6 +4,7 @@ from .io import (
     read_trajec_csv,
     previous_attempts,
     duplicated_attempts,
+    trajec,
     trajecs_from_df,
     trajecs_from_files,
     read_level_grid
