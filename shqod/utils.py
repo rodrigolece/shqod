@@ -82,9 +82,10 @@ def print_progress_bar(tick, max_tick, message = "", percent_decimal = 2, ETA_ES
 def path_curvature(path):
     tan = path[1:] - path[:-1]
     vel = np.linalg.norm(tan, axis=1)
-    tan = tan[np.nonzero(vel > 0)] # Remove stationary points
-    vel = vel[np.nonzero(vel > 0)] # Remove stationary points
-    tan /= vel.reshape(-1,1)
+    idx = vel > 0
+    tan = tan[idx] # Remove stationary points
+    vel = vel[idx] # Remove stationary points
+    tan = tan / vel[:,np.newaxis]
     curv = np.linalg.norm(tan[1:] - tan[:-1], axis=1)
     total_curv = np.sum(curv)
     return total_curv
@@ -94,14 +95,14 @@ def path_length(path):
     return np.sum(np.linalg.norm(path[1:] - path[:-1], axis=1))
 
 
-def path_dtb(path, map, invert=True, buffer = 0.001):
+def path_dtb(path, coords, invert=True, buffer = 0.001):
     """
     dtb = Distance to boundary
     Assume that map has 1 for filled region
     """
     # Get coordinates of filled region in the map; shape 2darray, each row is the coordinate.
-    map_filled_coords = np.vstack(np.nonzero(map)).transpose()
-    dm = distance_matrix(path, map_filled_coords)
+    # map_filled_coords = np.vstack(np.nonzero(map)).transpose()
+    dm = distance_matrix(path, coords)
     dtb = np.sum(1/(np.min(dm, axis=1)+buffer))
     return dtb
 

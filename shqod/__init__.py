@@ -1,6 +1,8 @@
 """shqod - Origin-Destination tools to work with the SHQ dataset."""
 
 from .io import (
+    TidyLoader,
+    UntidyLoader,
     read_trajec_csv,
     previous_attempts,
     duplicated_attempts,
@@ -19,5 +21,7 @@ from .matrices import (
     field_to_dict,
     mobility_functional
 )
+
+from .proc import TrajProcessor, NormativeProcessor
 
 from .trajectories import fractalD, trajectory_length

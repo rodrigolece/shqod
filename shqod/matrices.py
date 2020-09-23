@@ -1,7 +1,7 @@
 """Main functions to build an OD matrix and calculate the field."""
 
 from typing import Iterable, List, Tuple, Dict
-from .dtypes import Trajec, LexTrajec
+# from .dtypes import Trajec, LexTrajec
 
 import numpy as np
 import scipy.sparse as sp
@@ -9,13 +9,13 @@ from itertools import groupby
 from operator import itemgetter
 
 
-def od_matrix(lex_trajecs: Iterable[LexTrajec],
+def od_matrix(lex_trajecs: Iterable[np.array],
               grid_size: int) -> sp.csr.csr_matrix:
     """Calculate the OD matrix from a set lexicographic trajectories.
 
     Parameters
     ----------
-    lex_trajecs : Iterable[LexTrajec]
+    lex_trajecs : Iterable[np.array]
         The lexicographic trajectories to be used in counting the number of
         trips between locations.
     grid_size : int
@@ -30,9 +30,7 @@ def od_matrix(lex_trajecs: Iterable[LexTrajec],
     out = sp.lil_matrix((grid_size, grid_size), dtype=int)
 
     for t in lex_trajecs:
-        lst = list(t)
-
-        for i, j in zip(lst[:-1], lst[1:]):
+        for i, j in zip(t[:-1], t[1:]):
             out[i, j] += 1
 
     # Remove diagonal entries
@@ -43,7 +41,7 @@ def od_matrix(lex_trajecs: Iterable[LexTrajec],
     return csr
 
 
-def od_matrix_brokenup(trajecs: Iterable[Trajec],
+def od_matrix_brokenup(trajecs: Iterable[np.array],
                        grid_size: Tuple[int, int],
                        flags: np.array,
                        R: float = 3) -> List[sp.csr.csr_matrix]:
@@ -51,7 +49,7 @@ def od_matrix_brokenup(trajecs: Iterable[Trajec],
 
     Parameters
     ----------
-    trajecs : Iterable[Trajec]
+    trajecs : Iterable[np.array]
         The trajectories to be used in counting the number of
         trips between locations.
     grid_size : int
@@ -73,8 +71,7 @@ def od_matrix_brokenup(trajecs: Iterable[Trajec],
     out = [sp.lil_matrix((grid_size, grid_size), dtype=int)
            for _ in range(N)]
 
-    for t in trajecs:
-        arr = np.array(list(t))
+    for arr in trajecs:
         idx = breakup_array_by_flags(arr, flags, R=3)
 
         for k, sub_arr in enumerate(np.split(arr, idx[:-1])):
@@ -230,7 +227,7 @@ def field_to_dict(Xs: np.array, Fs: np.array) -> Dict[Tuple, np.array]:
     return out
 
 
-def mobility_functional(trajec: Trajec,
+def mobility_functional(trajec: np.array,
                         od_mat: sp.csr.csr_matrix,
                         grid_width: int,
                         nb_trajecs: int,
@@ -239,7 +236,7 @@ def mobility_functional(trajec: Trajec,
 
     Parameters
     ----------
-    trajec : Trajec
+    trajec : np.array
         The (x, y) trajectory for which the functional is computed.
     od_mat : csr_matrix
         The orgin-destination (OD) matrix to use as input.
@@ -264,10 +261,9 @@ def mobility_functional(trajec: Trajec,
                 *calculate_field(mat, grid_width, nb_trajecs=nb_trajecs)
             ) for mat in od_mat]
 
-        arr = np.array(list(trajec))
-        idx = breakup_array_by_flags(arr, flags, R=3)
+        idx = breakup_array_by_flags(trajec, flags, R=3)
 
-        for k, sub_arr in enumerate(np.split(arr, idx[:-1])):
+        for k, sub_arr in enumerate(np.split(trajec, idx[:-1])):
             for el in sub_arr:
                 Fi = field[k].get(tuple(el), np.zeros(2))
                 out += np.dot(Fi, el)
