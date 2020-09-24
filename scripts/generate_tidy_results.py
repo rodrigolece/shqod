@@ -22,10 +22,11 @@ from shqod import (
 
 project_dir = os.environ['dementia']  # set in the shell
 
-grids_dir = os.path.join(project_dir, 'data', 'raw', 'grids', '')
+grids_dir = os.path.join(project_dir, 'data', 'grids', '')
 
 processed_dir = os.path.join(project_dir, 'data', 'processed', '')
-apoe_dir = os.path.join(project_dir, 'data', 'apoe', 'dataframes')
+apoe_dir = os.path.join(project_dir, 'data', 'apoe_dataframes')
+ad_dir = os.path.join(project_dir, 'data', 'ad_dataframe')
 # e3e4_dir = os.path.join(apoe_dir, 'e3e4')
 # e3e3_dir = os.path.join(apoe_dir, 'e3e3')
 # e4e4_dir = os.path.join(apoe_dir, 'e4e4')
@@ -77,7 +78,7 @@ class NormativeBenchmark(object):
         inf = np.linalg.norm((norm_mat - od_mat).toarray(), np.inf)
 
         # Sum of matching entries
-        r, s = norm_mat.nonzero()
+        r, s = od_mat.nonzero()
         match = norm_mat[r, s].sum() / len(r)
 
         # Mobility functional
@@ -187,6 +188,7 @@ if __name__ == '__main__':
         os.path.join(apoe_dir, f)
         for f in os.listdir(apoe_dir)
     ]
+    populations += [os.path.join(ad_dir, 'ad.csv')]
 
     # We know beforehand the age ranges for the participants of the study
     Rs = ['5160', '6170', '71plus']
