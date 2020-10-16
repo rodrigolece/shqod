@@ -4,6 +4,7 @@ from typing import Tuple, Dict, Iterable
 # from .dtypes import Trajec, LexTrajec
 
 import os
+import warnings
 import re
 import json
 import collections
@@ -302,10 +303,11 @@ def trajecs_from_df(df: pd.DataFrame,
         assert grid_width is not None,\
             'error: grid_width is needed for lexicographic trajectory'
 
-    for _, row in df.iterrows():
+    for i, row in df.iterrows():
         t = trajec(row.trajectory_data)
 
         if t is None:
+            warnings.warn(f'corrupted data for entry: {i}')
             continue
         elif lexico:
             t = t[:, 1] * grid_width + t[:, 0]
