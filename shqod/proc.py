@@ -63,7 +63,7 @@ class NormativeProcessor(TrajProcessor):
 
         key = (self.level, self.gender)
         if key not in loader.loaded:
-            loader.get(*key, 19)  # arbitrary age simply to load the df
+            loader.get(*key)  # pre-load the df
 
         # This is used to store a particular instance of normative od matrix
         # as a tuple (mat, N) where N is the number of trajectories used
@@ -78,7 +78,7 @@ class NormativeProcessor(TrajProcessor):
     @normative_mat.setter
     def normative_mat(self, mat_N: Tuple[sp.csr.csr_matrix, int]):
         mat, N = mat_N
-        assert N > 0, 'expected positve N'
+        assert N > 0, 'expected positive N'
         self._normative_mat = mat_N
         self.normalised_mat = mat / N
 

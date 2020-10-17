@@ -8,6 +8,7 @@ import warnings
 import re
 import json
 import collections
+import pyarrow.feather as feather
 import numpy as np
 import pandas as pd
 
@@ -106,28 +107,33 @@ class UntidyLoader(object):
         to the method `get`.
 
     """
-    def __init__(self, directory: str) -> Dict[str, str]:
+    def __init__(self, directory: str, fmt: str = 'csv') -> Dict[str, str]:
         """
         Load the untidy CSV files contained within `directory`.
 
         Parameters
         ----------
         directory : str
+        fmt : {'csv', 'feather'}
+            Default is 'csv'.
 
         """
+        assert fmt in ('csv', 'feather'), f'error: invalid format {fmt}'
+
         self.loaded = dict()
         self._files = dict()
+        self._fmt = fmt
 
         for file in os.listdir(directory):
-            match = re.search(r'_(\d+)_\w*_(f|m)', file)
+            match = re.search(rf'_(\d+)_\w*_(f|m).{fmt}', file)
             if match:
-                age, gender = match.groups()
-                key = (int(age), gender)
+                lvl, gender = match.groups()
+                key = (int(lvl), gender)
                 self._files[key] = os.path.join(directory, file)
 
         return None
 
-    def get(self, level: int, gender: str, age: int) -> pd.DataFrame:
+    def get(self, level: int, gender: str, age: int = None) -> pd.DataFrame:
         """
         Get the DataFrame for a given level, gender and age.
 
@@ -139,7 +145,7 @@ class UntidyLoader(object):
         ----------
         level : int
         gender : {'f', 'm'}
-        age : int
+        age : int, optional
 
         Returns
         -------
@@ -148,16 +154,50 @@ class UntidyLoader(object):
         """
         key = (level, gender)
         file = self._files.get(key)
+
         if file:
-            if key not in self.loaded:
+            if key not in self.loaded and self._fmt == 'csv':
                 self.loaded[key] = read_trajec_csv(file)
+            elif key not in self.loaded and self._fmt == 'feather':
+                self.loaded[key] = read_trajec_feather(file)
+
             df = self.loaded[key]
-            out = df.loc[df.age == age]
+
+            # if age was passed as argument, filter
+            out = df.loc[df.age == age] if age else df
 
         else:
             raise FileNotFoundError
 
         return out
+
+    def json_to_array(self, df: pd.DataFrame) -> None:
+        """Convert the `trajectory_data` columns from json to array.
+
+        Warning: this modifies the DataFrame in place.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+
+        Returns
+        -------
+        None
+
+        """
+        assert 'trajectory_data' in df,\
+            'error: DataFrame does not contain trajectory data'
+
+        for i, row in df.iterrows():
+            t = trajec(row.trajectory_data)
+
+            if t is None:
+                warnings.warn('corrupted data; dropping row')
+                df.drop(i, inplace=True)
+            else:
+                df.at[i, 'trajectory_data'] = t
+
+        return None
 
 
 def read_trajec_csv(filename: str) -> pd.DataFrame:
@@ -176,6 +216,31 @@ def read_trajec_csv(filename: str) -> pd.DataFrame:
     df = pd.read_csv(filename)
     assert 'trajectory_data' in df,\
         'error: file does not contain trajectory data'
+
+    return df
+
+
+def read_trajec_feather(filename: str) -> pd.DataFrame:
+    """
+    Read a feather file containing trajectory data into a DataFrame.
+
+    Parameters
+    ----------
+    filename : str
+
+    Returns
+    -------
+    pd.DataFrame
+
+    """
+    df = feather.read_feather(filename)
+    assert 'trajectory_data' in df,\
+        'error: file does not contain trajectory data'
+
+    for i, row in df.iterrows():
+        arr = row.trajectory_data
+        N = len(arr)
+        df.at[i, 'trajectory_data'] = arr.reshape((N//2, 2), order='C')
 
     return df
 

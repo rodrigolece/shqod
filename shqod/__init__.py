@@ -4,6 +4,7 @@ from .io import (
     TidyLoader,
     UntidyLoader,
     read_trajec_csv,
+    read_trajec_feather,
     previous_attempts,
     duplicated_attempts,
     trajec,
