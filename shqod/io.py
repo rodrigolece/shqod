@@ -1,6 +1,6 @@
 """Read and write data."""
 
-from typing import Tuple, Dict, Iterable
+from typing import Tuple, Dict, Iterable, Union
 # from .dtypes import Trajec, LexTrajec
 
 import os
@@ -41,6 +41,7 @@ class TidyLoader(object):
 
         """
         self.loaded = dict()
+        self._current_fmt = 'json'
 
         for d in dirs:
             self.loaded.update(self._load_csv_dir(d))
@@ -60,6 +61,20 @@ class TidyLoader(object):
             out[key] = df
 
         return out
+
+    def json_to_array(self) -> None:
+        """Convert the `loaded` `trajectory_data` columns from json to array.
+
+        Warning: this modifies the DataFrames in-place.
+
+        """
+        if self._current_fmt == 'json':
+            self._current_fmt = 'array'
+
+            for df in self.loaded.values():
+                json_to_array(df, inplace=True)
+
+        return None
 
     def get(self, level: int, gender: str = None) -> Dict[str, pd.DataFrame]:
         """
@@ -86,34 +101,6 @@ class TidyLoader(object):
                 out[key] = df.loc[idx]
 
         return out
-
-    def json_to_array(self, df: pd.DataFrame) -> None:
-        """Convert the `trajectory_data` columns from json to array.
-
-        Warning: this modifies the DataFrame in place.
-
-        Parameters
-        ----------
-        df : pd.DataFrame
-
-        Returns
-        -------
-        None
-
-        """
-        assert 'trajectory_data' in df,\
-            'error: DataFrame does not contain trajectory data'
-
-        for i, row in df.iterrows():
-            t = trajec(row.trajectory_data)
-
-            if t is None:
-                warnings.warn('corrupted data; dropping row')
-                df.drop(i, inplace=True)
-            else:
-                df.at[i, 'trajectory_data'] = t
-
-        return None
 
 
 class UntidyLoader(object):
@@ -155,6 +142,7 @@ class UntidyLoader(object):
         self.loaded = dict()
         self._files = dict()
         self._fmt = fmt
+        self._current_fmt = dict()
 
         for file in os.listdir(directory):
             match = re.search(rf'_(\d+)_\w*_(f|m).{fmt}', file)
@@ -162,6 +150,19 @@ class UntidyLoader(object):
                 lvl, gender = match.groups()
                 key = (int(lvl), gender)
                 self._files[key] = os.path.join(directory, file)
+
+        return None
+
+    def json_to_array(self) -> None:
+        """Convert the `loaded` `trajectory_data` columns from json to array.
+
+        Warning: this modifies the DataFrames in-place.
+
+        """
+        for key, fmt in self._current_fmt.items():
+            if fmt == 'json':
+                self._current_fmt[key] = 'array'
+                json_to_array(self.loaded[key], inplace=True)
 
         return None
 
@@ -190,8 +191,11 @@ class UntidyLoader(object):
         if file:
             if key not in self.loaded and self._fmt == 'csv':
                 self.loaded[key] = read_trajec_csv(file)
+                self._current_fmt[key] = 'json'
+
             elif key not in self.loaded and self._fmt == 'feather':
                 self.loaded[key] = read_trajec_feather(file)
+                self._current_fmt[key] = 'array'
 
             df = self.loaded[key]
 
@@ -203,33 +207,39 @@ class UntidyLoader(object):
 
         return out
 
-    def json_to_array(self, df: pd.DataFrame) -> None:
-        """Convert the `trajectory_data` columns from json to array.
 
-        Warning: this modifies the DataFrame in place.
+def json_to_array(df: pd.DataFrame,
+                  inplace: bool = False) -> Union[pd.DataFrame, None]:
+    """Convert the `trajectory_data` column from json to array.
 
-        Parameters
-        ----------
-        df : pd.DataFrame
-
-        Returns
-        -------
-        None
-
-        """
-        assert 'trajectory_data' in df,\
-            'error: DataFrame does not contain trajectory data'
-
-        for i, row in df.iterrows():
-            t = trajec(row.trajectory_data)
-
-            if t is None:
-                warnings.warn('corrupted data; dropping row')
-                df.drop(i, inplace=True)
-            else:
-                df.at[i, 'trajectory_data'] = t
-
+    Parameters
+    ----------
+    df : pd.DataFrame
+    inplace : bool, optional
+        If False, return a copy. Otherwise do operation in-place and
         return None
+
+    """
+    assert 'trajectory_data' in df,\
+        'error: DataFrame does not contain trajectory data'
+
+    if inplace:
+        out = None
+
+    else:
+        df = df.copy()
+        out = df
+
+    for i, row in df.iterrows():
+        t = trajec(row.trajectory_data)
+
+        if t is None:
+            warnings.warn('corrupted data; dropping row')
+            df.drop(i, inplace=True)
+        else:
+            df.at[i, 'trajectory_data'] = t
+
+    return out
 
 
 def read_trajec_csv(filename: str) -> pd.DataFrame:
