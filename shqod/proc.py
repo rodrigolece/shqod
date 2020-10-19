@@ -4,10 +4,12 @@ from typing import Tuple
 from .io import UntidyLoader, read_level_grid, trajecs_from_df
 from .matrices import od_matrix, mobility_functional
 from .utils import path_length, path_curvature, path_dtb
+from .smoothing import smooth
 
 import os
 import numpy as np
 import scipy.sparse as sp
+import pandas as pd
 from esig import tosig as pathsig
 
 
@@ -54,6 +56,40 @@ class TrajProcessor(object):
 
     def get_dtb(self, trajec):
         return path_dtb(trajec, self.grid_coords)
+
+    def get_smooth_features(self, df, feat_types):
+        #TODO: some sort of check for the feat_types
+        out = df.drop(columns='trajectory_data')
+
+        N = len(df)
+        sig_flag = False
+
+        if 'sig' in feat_types:
+            sig_flag = True
+            sig_arr = np.zeros((N, 8))  # TODO: always 8 or depends of hp?
+            feat_types = feat_types.copy()
+            feat_types.pop(feat_types.index('sig'))
+
+        methods = [getattr(self, f'get_{feat}') for feat in feat_types]
+        methods = list(filter(None.__ne__, methods))
+
+        arr = np.zeros((N, len(methods)))
+        cols = feat_types.copy()
+
+        for i, row in df.iterrows():
+            path = smooth(row.trajectory_data)
+            arr[i] = [method(path) for method in methods]
+
+            if sig_flag:
+                sig_arr[i] = self.get_sig(path)
+
+        if sig_flag:
+            arr = np.hstack((arr, sig_arr))
+            cols += ['sig' + str(i) for i in range(1, 9)]  # TODO: same, 8?
+
+        results_df = pd.DataFrame(arr, columns=cols).join(out['id'])
+
+        return out.merge(results_df, on='id')
 
 
 class NormativeProcessor(TrajProcessor):
