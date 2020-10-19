@@ -61,13 +61,14 @@ class TidyLoader(object):
 
         return out
 
-    def get_level(self, level: int) -> Dict[str, pd.DataFrame]:
+    def get(self, level: int, gender: str = None) -> Dict[str, pd.DataFrame]:
         """
-        Get the portion of the loaded DataFrames for a given level.
+        Get the portion of the DataFrames for a level and optionally gender.
 
         Parameters
         ----------
         level : int
+        gender : {'f', 'm'}, optional
 
         Returns
         -------
@@ -78,10 +79,41 @@ class TidyLoader(object):
 
         for key, df in self.loaded.items():
             idx = (df.level == level)
+            if gender:
+                idx = idx & (df.gender == gender)
+
             if idx.any():
                 out[key] = df.loc[idx]
 
         return out
+
+    def json_to_array(self, df: pd.DataFrame) -> None:
+        """Convert the `trajectory_data` columns from json to array.
+
+        Warning: this modifies the DataFrame in place.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+
+        Returns
+        -------
+        None
+
+        """
+        assert 'trajectory_data' in df,\
+            'error: DataFrame does not contain trajectory data'
+
+        for i, row in df.iterrows():
+            t = trajec(row.trajectory_data)
+
+            if t is None:
+                warnings.warn('corrupted data; dropping row')
+                df.drop(i, inplace=True)
+            else:
+                df.at[i, 'trajectory_data'] = t
+
+        return None
 
 
 class UntidyLoader(object):
