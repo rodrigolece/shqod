@@ -133,9 +133,11 @@ class NormativeProcessor(TrajProcessor):
         df = self._get_df_for_age(age)
         N = len(df)
 
-        # lex_ts = trajecs_from_df(df, lexico=True, grid_width=wd)
-        # TODO: check if fmt is csv or feather (is it json or array)
+       #  if self.loader._fmt == 'csv':
+       #      lex_ts = trajecs_from_df(df, lexico=True, grid_width=wd)
+       #  else:  # .feather
         lex_ts = [wd*t[:, 1] + t[:, 0] for t in df.trajectory_data]
+
         od_mat = od_matrix(lex_ts, wd*lg)
 
         return od_mat, N
