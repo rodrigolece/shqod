@@ -59,9 +59,9 @@ class TrajProcessor(object):
 
     def get_smooth_features(self, df, feat_types):
         #TODO: some sort of check for the feat_types
-        out = df.drop(columns='trajectory_data')
+        out = df.reset_index(drop=True)
+        N = len(out)
 
-        N = len(df)
         sig_flag = False
 
         if 'sig' in feat_types:
@@ -76,7 +76,7 @@ class TrajProcessor(object):
         arr = np.zeros((N, len(methods)))
         cols = feat_types.copy()
 
-        for i, row in df.iterrows():
+        for i, row in out.iterrows():
             path = smooth(row.trajectory_data)
             arr[i] = [method(path) for method in methods]
 
@@ -88,6 +88,7 @@ class TrajProcessor(object):
             cols += ['sig' + str(i) for i in range(1, 9)]  # TODO: same, 8?
 
         results_df = pd.DataFrame(arr, columns=cols).join(out['id'])
+        out = out.drop(columns='trajectory_data')
 
         return out.merge(results_df, on='id')
 
@@ -106,6 +107,9 @@ class NormativeProcessor(TrajProcessor):
         self._normative_mat = None
 
         return None
+
+    def __str__(self):
+        return f'Normative processor: {self.country} - {self.gender} - {self.level}'
 
     @property
     def normative_mat(self):
@@ -129,7 +133,9 @@ class NormativeProcessor(TrajProcessor):
         df = self._get_df_for_age(age)
         N = len(df)
 
-        lex_ts = trajecs_from_df(df, lexico=True, grid_width=wd)
+        # lex_ts = trajecs_from_df(df, lexico=True, grid_width=wd)
+        # TODO: check if fmt is csv or feather (is it json or array)
+        lex_ts = [wd*t[:, 1] + t[:, 0] for t in df.trajectory_data]
         od_mat = od_matrix(lex_ts, wd*lg)
 
         return od_mat, N
@@ -173,3 +179,23 @@ class NormativeProcessor(TrajProcessor):
         normative_mat, N = self.normative_mat
 
         return mobility_functional(trajec, normative_mat, wd, N)
+
+    def get_coarse_features(self, df, feat_types):
+        # TODO: some sort of check for the feat_types
+        out = df.reset_index(drop=True)
+        N = len(out)
+
+        methods = [getattr(self, f'get_{feat}') for feat in feat_types]
+        methods = list(filter(None.__ne__, methods))
+
+        arr = np.zeros((N, len(methods)))
+        cols = feat_types.copy()
+
+        for i, row in out.iterrows():
+            path = row.trajectory_data
+            arr[i] = [method(path) for method in methods]
+
+        results_df = pd.DataFrame(arr, columns=cols).join(out['id'])
+        out = out.drop(columns='trajectory_data')
+
+        return out.merge(results_df, on='id')
