@@ -106,7 +106,7 @@ print('\nUsing NormativeProcessor')
 norm = NormativeProcessor(norm_loader, level, gender, **hp)
 # note, the processor take the normative trajectories loader
 
-# Initially the features cannot be used because the reference od mattrix has
+# Initially the features cannot be used because the reference od matrix has
 # not been set
 print('\nTrying to calcucate the features without reference')
 try:
