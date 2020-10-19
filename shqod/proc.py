@@ -7,8 +7,10 @@ from .utils import path_length, path_curvature, path_dtb
 from .smoothing import smooth
 
 import os
+from functools import lru_cache
 import numpy as np
 import scipy.sparse as sp
+import scipy.stats as st
 import pandas as pd
 from esig import tosig as pathsig
 
@@ -121,26 +123,46 @@ class NormativeProcessor(TrajProcessor):
         assert N > 0, 'expected positive N'
         self._normative_mat = mat_N
         self.normalised_mat = mat / N
+        # TODO: fix compatibility with window; normalised_mat
 
         return None
 
     def _get_df_for_age(self, age: int):
-        return self.loader.get(self.level, self.gender, age)
+        df = self.loader.get(self.level, self.gender, age)
+        self.loader.json_to_array()  # we make sure to always work with arrays
+        return df
 
+    @lru_cache
     def normative_od_matrix_for_age(self, age: int):
         wd, lg = self.grid_width, self.grid_length
 
         df = self._get_df_for_age(age)
         N = len(df)
 
-       #  if self.loader._fmt == 'csv':
-       #      lex_ts = trajecs_from_df(df, lexico=True, grid_width=wd)
-       #  else:  # .feather
         lex_ts = [wd*t[:, 1] + t[:, 0] for t in df.trajectory_data]
-
         od_mat = od_matrix(lex_ts, wd*lg)
 
         return od_mat, N
+
+    @lru_cache
+    def normative_od_matrix_window(self, centre, window=5, scale=2.0):
+        # TODO: pass window and scale as hyperparams to the consturctor
+        ages = range(centre - window, centre + window + 1)
+        if scale == np.inf:
+            weights = np.ones(len(ages))
+        else:
+            weights = st.distributions.norm(centre, scale=scale).pdf(ages)
+            weights /= weights.sum()
+
+        wd, lg = self.grid_width, self.grid_length
+        N = wd * lg
+        out = sp.csr_matrix((N, N))
+
+        for i, age in enumerate(ages):
+            mat, N = self.normative_od_matrix_for_age(age)
+            out += weights[i]*mat / N
+
+        return out
 
     def _od_matrix_from_trajec(self, trajec):
         if self._normative_mat is None:
