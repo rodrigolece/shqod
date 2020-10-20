@@ -223,3 +223,17 @@ class NormativeProcessor(TrajProcessor):
         out = out.drop(columns='trajectory_data')
 
         return out.merge(results_df, on='id')
+
+    def get_windowed_features(self, df, feat_types, window=5, scale=2.0):
+        # TODO: pass arguments as hyperparameters
+        # TODO: some sort of check for feat_types
+
+        gby = df.groupby('age')
+        out = []
+
+        for age, age_df in gby:
+            wmat = self.normative_od_matrix_window(age, window=window, scale=scale)
+            self._normative_mat = wmat  # we skip tests
+            out.append(self.get_coarse_features(age_df, feat_types))
+
+        return pd.concat(out).sort_values('id').reset_index(drop=True)
