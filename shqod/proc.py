@@ -118,13 +118,12 @@ class NormativeProcessor(TrajProcessor):
         return self._normative_mat
 
     @normative_mat.setter
-    def normative_mat(self, mat_N: Tuple[sp.csr.csr_matrix, int]):
-        mat, N = mat_N
-        assert N > 0, 'expected positive N'
-        self._normative_mat = mat_N
-        self.normalised_mat = mat / N
-        # TODO: fix compatibility with window; normalised_mat
-
+    def normative_mat(self, mat):
+        assert sp.isspmatrix_csr(mat), 'error: invalid format for matrix'
+        wd, lg = self.grid_width, self.grid_length
+        N = wd * lg
+        assert mat.shape == (N, N), 'error: invalid dimensions for matrix'
+        self._normative_mat = mat
         return None
 
     def _get_df_for_age(self, age: int):
@@ -165,7 +164,7 @@ class NormativeProcessor(TrajProcessor):
         return out
 
     def _od_matrix_from_trajec(self, trajec):
-        if self._normative_mat is None:
+        if self.normative_mat is None:
             raise Exception('normative OD matrix has not been set')
 
         wd, lg = self.grid_width, self.grid_length
@@ -174,37 +173,38 @@ class NormativeProcessor(TrajProcessor):
         return od_matrix([lex], wd*lg)
 
     def get_fro(self, trajec):
-        if self._normative_mat is None:
+        if self.normative_mat is None:
             raise Exception('normative OD matrix has not been set')
 
         od_mat = self._od_matrix_from_trajec(trajec)
-        return np.linalg.norm((self.normalised_mat - od_mat).toarray(), 'fro')
+        return np.linalg.norm((self.normative_mat - od_mat).toarray(), 'fro')
 
     def get_inf(self, trajec):
-        if self._normative_mat is None:
+        if self.normative_mat is None:
             raise Exception('normative OD matrix has not been set')
 
         od_mat = self._od_matrix_from_trajec(trajec)
-        return np.linalg.norm((self.normalised_mat - od_mat).toarray(), np.inf)
+        return np.linalg.norm((self.normative_mat - od_mat).toarray(), np.inf)
 
     def get_sum_match(self, trajec):
-        if self._normative_mat is None:
+        if self.normative_mat is None:
             raise Exception('normative OD matrix has not been set')
 
         od_mat = self._od_matrix_from_trajec(trajec)
         r, s = od_mat.nonzero()
-        return self.normalised_mat[r, s].sum() / len(r)
+        return self.normative_mat[r, s].sum() / len(r)
 
     def get_mob(self, trajec):
-        if self._normative_mat is None:
+        if self.normative_mat is None:
             raise Exception('normative OD matrix has not been set')
 
         wd = self.grid_width
-        normative_mat, N = self.normative_mat
-
-        return mobility_functional(trajec, normative_mat, wd, N)
+        return mobility_functional(trajec, self.normative_mat, wd)
 
     def get_coarse_features(self, df, feat_types):
+        if self.normative_mat is None:
+            raise Exception('normative OD matrix has not been set')
+
         # TODO: some sort of check for the feat_types
         out = df.reset_index(drop=True)
         N = len(out)

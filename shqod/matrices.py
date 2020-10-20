@@ -153,8 +153,7 @@ def reduce_matrix(square_mat: sp.csr.csr_matrix,
 
 
 def calculate_field(od_mat: sp.csr.csr_matrix,
-                    grid_width: int,
-                    nb_trajecs: int = None) -> Tuple[np.array, np.array]:
+                    grid_width: int) -> Tuple[np.array, np.array]:
     """Calculate the field at each location (origin) where it is non-zero.
 
     Parameters
@@ -163,8 +162,6 @@ def calculate_field(od_mat: sp.csr.csr_matrix,
         The orgin-destination (OD) matrix to use as input.
     grid_width : int
         The width of the grid in the level.
-    nb_trajecs : int or None, optional
-        If provided, normalise the field by dividing by this number.
 
     Returns
     -------
@@ -197,9 +194,6 @@ def calculate_field(od_mat: sp.csr.csr_matrix,
         Fs[k] += weighted_vec[start:end].sum(axis=0)
         start = end
 
-    if nb_trajecs:
-        Fs /= nb_trajecs
-
     return Xs, Fs
 
 
@@ -230,7 +224,6 @@ def field_to_dict(Xs: np.array, Fs: np.array) -> Dict[Tuple, np.array]:
 def mobility_functional(trajec: np.array,
                         od_mat: sp.csr.csr_matrix,
                         grid_width: int,
-                        nb_trajecs: int,
                         flags: np.array = None) -> float:
     """Short summary.
 
@@ -242,8 +235,6 @@ def mobility_functional(trajec: np.array,
         The orgin-destination (OD) matrix to use as input.
     grid_width : int
         The width of the grid in the level.
-    nb_trajecs : int or None, optional
-        If provided, normalise the field by dividing by this number.
 
     Returns
     -------
@@ -257,9 +248,9 @@ def mobility_functional(trajec: np.array,
     if isinstance(od_mat, list):
         assert flags is not None, 'error: provide the coodinates of the flags'
         field = [
-            field_to_dict(
-                *calculate_field(mat, grid_width, nb_trajecs=nb_trajecs)
-            ) for mat in od_mat]
+            field_to_dict(*calculate_field(mat, grid_width))
+            for mat in od_mat
+        ]
 
         idx = breakup_array_by_flags(trajec, flags, R=3)
 
@@ -270,9 +261,7 @@ def mobility_functional(trajec: np.array,
                 N += 1
 
     else:
-        field = field_to_dict(
-            *calculate_field(od_mat, grid_width, nb_trajecs=nb_trajecs)
-        )
+        field = field_to_dict(*calculate_field(od_mat, grid_width))
 
         for el in trajec:
             Fi = field.get(tuple(el), np.zeros(2))

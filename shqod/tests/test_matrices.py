@@ -25,6 +25,7 @@ class TestIO(unittest.TestCase):
         # 2x2 data for field
         small_lex = [[0, 2, 3], [0, 1, 3], [0, 2, 3], [0, 1]]
         self.small_mat = od_matrix(small_lex, 4)
+        self.small_grid_width = 2
 
     def test_od_matrix(self):
         """Calculate OD matrix from trajectories."""
@@ -39,32 +40,44 @@ class TestIO(unittest.TestCase):
         self.assertEqual(i.tolist(), [0, 0, 1, 3, 4, 4, 5, 7])  # Os
         self.assertEqual(j.tolist(), [1, 3, 4, 4, 5, 7, 8, 8])  # Ds
 
+        # the small mat
+        desired = np.array([
+            [0, 2, 2, 0],
+            [0, 0, 0, 1],
+            [0, 0, 0, 2],
+            [0, 0, 0, 0]
+        ])
+        self.assertTrue(np.allclose(self.small_mat.toarray(), desired))
+
     def test_reduce_matrix(self):
         """Eliminate zero rows and zero columns."""
         input = np.array([[1, 0, 0], [0, 0, 0], [0, 0, 1]])
         desired_out = np.array([[1, 0], [0, 1]])
         self.assertTrue(np.all(reduce_matrix(input) == desired_out))
 
+    def test_calculate_field(self):
+        """Calculate the mobility field."""
+        Xs, Fs = calculate_field(self.small_mat, self.small_grid_width)
+
+        # Note that test is susceptible to order of arrays
+        desired_Xs = [[0, 0], [1, 0], [0, 1]]
+        desired_Fs = [[2, 2], [0, 1], [2, 0]]
+
+        self.assertTrue(np.allclose(Xs, desired_Xs))
+        self.assertTrue(np.allclose(Fs, desired_Fs))
+
     def test_field_to_dict(self):
         """Convert arrays that define field to dict."""
-        Xs = np.array([[0, 0], [0, 1], [1, 0]])
-        Fs = np.array([[1, 1], [1, 0], [0, 1]])
-        d = field_to_dict(Xs, Fs)
-        self.assertTrue(np.all(d[(0, 0)] == np.array([1, 1])))
-        self.assertTrue(np.all(d[(0, 1)] == np.array([1, 0])))
-        self.assertTrue(np.all(d[(1, 0)] == np.array([0, 1])))
+        Xs = np.array([[0, 0], [1, 0], [0, 1]])
+        Fs = np.array([[2, 2], [0, 1], [2, 0]])
 
-    # def test_calculate_field(self):
-    #     """Calculate the mobility field."""
-    #     # [[0, 2, 3], [0, 1, 3], [0, 2, 3], [0, 1]]
-    #     Xs, Fs = calculate_field(self.small_mat)
-    #
-    #     desired_out = ([(0, 0), (1, 0), (0, 1)], [(1, 1), (1, 0)])
-    #
-    #     self.assertEqual(calculate_field(), desired_out)
+        d = field_to_dict(Xs, Fs)
+        self.assertTrue(np.allclose(d[(0, 0)], [2, 2]))
+        self.assertTrue(np.allclose(d[(1, 0)], [0, 1]))
+        self.assertTrue(np.allclose(d[(0, 1)], [2, 0]))
 
     def test_mobility_funcitonal(self):
-        """Calculate a the mobility functional."""
+        """Calculate the mobility functional."""
         # TODO: Fill test
         pass
 
