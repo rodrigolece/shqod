@@ -4,17 +4,18 @@ import scipy.stats as st
 from tabulate import tabulate
 
 
-def pvalues(df, groups, correct_gameplay=False):
+def pvalues(df, groups, test_names, correct_gameplay=False):
     """Calculate p-values for the given groups."""
 
     g1, g2 = groups
     levels = set(df.level)
+    nb_tests = len(test_names)
 
     # The test names come directly from generate_tidy_results.py
-    test_names = [
-        'Frob. norm', 'Inf. norm', 'Restrict. sum',
-        'Mobty functional', 'Fractal dim.', 'Tot. length'
-    ]
+    # test_names = [
+    #     'Frob. norm', 'Inf. norm', 'Restrict. sum',
+    #     'Mobty functional', 'Fractal dim.', 'Tot. length'
+    # ]
 
     if correct_gameplay:
         # We use the results for the first two levels to correct for gameplay
@@ -42,7 +43,7 @@ def pvalues(df, groups, correct_gameplay=False):
         pvals = [st.ttest_ind(first[test_names].values[:, i],
                               second[test_names].values[:, i],
                               equal_var=False).pvalue
-                 for i in range(6)]
+                 for i in range(nb_tests)]
         level_pvals.append([lvl] + pvals)
 
     return level_pvals
@@ -63,16 +64,23 @@ if __name__ == '__main__':
     assert len(groups) == 2, 'should give two groups'
 
     # Read the input data
-    results_df = pd.read_csv(filename)
-    idx = results_df.group.isin([*groups])
-    results_df = results_df.loc[idx]
+    feat_df = pd.read_csv(filename)
+    idx = feat_df.group.isin([*groups])
+    feat_df = feat_df.loc[idx]
+
+    drop_cols = [
+        'id', 'level', 'age', 'group', 'gender', 'marital', 'education',
+        'education_yrs', 'handedness', 'diagnosis'
+    ]
+    test_names = feat_df.columns.drop(drop_cols, errors='ignore')
 
     # Calculate the p-values with and without correction
-    pvals = pvalues(results_df, groups, correct_gameplay=False)
-    correc_pvals = pvalues(results_df, groups, correct_gameplay=True)
+    pvals = pvalues(feat_df, groups, test_names, correct_gameplay=False)
+    correc_pvals = pvalues(feat_df, groups, test_names, correct_gameplay=True)
 
-    head = ['Level', 'Frob. norm', 'Inf. norm', 'Restrict. sum',
-            'Mobty functional', 'Fractal dim.', 'Tot. length']
+    # head = ['Level', 'Frob. norm', 'Inf. norm', 'Restrict. sum',
+    #         'Mobty functional', 'Fractal dim.', 'Tot. length']
+    head = ['Level'] + test_names.tolist()
 
     print('\np-values, no gameplay correction')
     print(tabulate(pvals, headers=head, floatfmt='.3f'))
