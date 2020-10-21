@@ -1,7 +1,7 @@
 """Calculate features from trajectories."""
 
 from typing import Tuple
-from .io import UntidyLoader, read_level_grid, trajecs_from_df
+from .io import UntidyLoader, read_level_grid
 from .matrices import od_matrix, mobility_functional
 from .utils import path_length, path_curvature, path_dtb
 from .smoothing import smooth
@@ -59,8 +59,8 @@ class TrajProcessor(object):
     def get_dtb(self, trajec):
         return path_dtb(trajec, self.grid_coords)
 
-    def get_smooth_features(self, df, feat_types):
-        #TODO: some sort of check for the feat_types
+    def get_smooth_features(self, df, feat_types, keys=['id']):
+        # TODO: some sort of check for the feat_types
         out = df.reset_index(drop=True)
         N = len(out)
 
@@ -89,16 +89,23 @@ class TrajProcessor(object):
             arr = np.hstack((arr, sig_arr))
             cols += ['sig' + str(i) for i in range(1, 9)]  # TODO: same, 8?
 
-        results_df = pd.DataFrame(arr, columns=cols).join(out['id'])
+        results_df = pd.DataFrame(arr, columns=cols).join(out[keys])
         out = out.drop(columns='trajectory_data')
 
-        return out.merge(results_df, on='id')
+        return out.merge(results_df, on=keys)
 
 
 class NormativeProcessor(TrajProcessor):
     def __init__(self, loader: UntidyLoader, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.loader = loader
+
+        assert 'window_size' in kwargs, "hyperparameter needed: 'window_size'"
+        assert 'weight_scale' in kwargs, \
+                "hyperparameter needed: 'weight_scale'"
+
+        self.window_size = kwargs['window_size']
+        self.weight_scale = kwargs['weight_scale']
 
         key = (self.level, self.gender)
         if key not in loader.loaded:
@@ -144,9 +151,12 @@ class NormativeProcessor(TrajProcessor):
         return od_mat, N
 
     @lru_cache
-    def normative_od_matrix_window(self, centre, window=5, scale=2.0):
-        # TODO: pass window and scale as hyperparams to the consturctor
+    def normative_od_matrix_window(self, centre):
+        window = self.window_size
+        scale = self.weight_scale
+
         ages = range(centre - window, centre + window + 1)
+
         if scale == np.inf:
             weights = np.ones(len(ages))
         else:
@@ -201,7 +211,7 @@ class NormativeProcessor(TrajProcessor):
         wd = self.grid_width
         return mobility_functional(trajec, self.normative_mat, wd)
 
-    def get_coarse_features(self, df, feat_types):
+    def get_coarse_features(self, df, feat_types, keys=['id']):
         if self.normative_mat is None:
             raise Exception('normative OD matrix has not been set')
 
@@ -219,21 +229,20 @@ class NormativeProcessor(TrajProcessor):
             path = row.trajectory_data
             arr[i] = [method(path) for method in methods]
 
-        results_df = pd.DataFrame(arr, columns=cols).join(out['id'])
+        results_df = pd.DataFrame(arr, columns=cols).join(out[keys])
         out = out.drop(columns='trajectory_data')
 
-        return out.merge(results_df, on='id')
+        return out.merge(results_df, on=keys)
 
-    def get_windowed_features(self, df, feat_types, window=5, scale=2.0):
-        # TODO: pass arguments as hyperparameters
+    def get_windowed_features(self, df, feat_types, keys=['id']):
         # TODO: some sort of check for feat_types
 
         gby = df.groupby('age')
         out = []
 
         for age, age_df in gby:
-            wmat = self.normative_od_matrix_window(age, window=window, scale=scale)
+            wmat = self.normative_od_matrix_window(age)
             self._normative_mat = wmat  # we skip tests
-            out.append(self.get_coarse_features(age_df, feat_types))
+            out.append(self.get_coarse_features(age_df, feat_types, keys=keys))
 
         return pd.concat(out).sort_values('id').reset_index(drop=True)
