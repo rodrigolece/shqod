@@ -234,7 +234,7 @@ class NormativeProcessor(TrajProcessor):
 
         return out.merge(results_df, on=keys)
 
-    def get_windowed_features(self, df, feat_types, keys=['id']):
+    def get_windowed_features(self, df, feat_types, keys=['id'], sort_id=False):
         # TODO: some sort of check for feat_types
 
         gby = df.groupby('age')
@@ -245,4 +245,9 @@ class NormativeProcessor(TrajProcessor):
             self._normative_mat = wmat  # we skip tests
             out.append(self.get_coarse_features(age_df, feat_types, keys=keys))
 
-        return pd.concat(out).sort_values('id').reset_index(drop=True)
+        if sort_id:
+            out = pd.concat(out).sort_values('id').reset_index(drop=True)
+        else:
+            out = pd.concat(out, ignore_index=True)
+
+        return out
