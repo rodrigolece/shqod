@@ -121,12 +121,14 @@ class UntidyLoader(object):
     Attributes
     ----------
     loaded : Dict[(level, gender), pd.DataFrame]
-        The loaded trajectory DataFrames, indexed by level (int) and
-        gender (one of 'f', 'm'). The DataFrames are loaded lazily by calls
+        The loaded DataFrames, indexed by level (int) and gender
+        (one of 'f', 'm'). The DataFrames are loaded lazily by calls
         to the method `get`.
 
     """
-    def __init__(self, directory: str, fmt: str = 'csv') -> Dict[str, str]:
+    def __init__(self, directory: str,
+                 fmt: str = 'csv',
+                 trajec: bool = True) -> Dict[str, str]:
         """
         Load the untidy CSV files contained within `directory`.
 
@@ -135,6 +137,9 @@ class UntidyLoader(object):
         directory : str
         fmt : {'csv', 'feather'}
             Default is 'csv'.
+        trajec : bool
+            Whether the files being loaded should be treated as including
+            trajectories (default is True).
 
         """
         assert fmt in ('csv', 'feather'), f'error: invalid format {fmt}'
@@ -142,7 +147,9 @@ class UntidyLoader(object):
         self.loaded = dict()
         self._files = dict()
         self._fmt = fmt
-        self._current_fmt = dict()
+        self._trajec = trajec
+
+        self._current_fmt = dict()  # used when the type is changed
 
         for file in os.listdir(directory):
             match = re.search(rf'_(\d+)_\w*_(f|m).{fmt}', file)
@@ -154,11 +161,18 @@ class UntidyLoader(object):
         return None
 
     def json_to_array(self) -> None:
-        """Convert the `loaded` `trajectory_data` columns from json to array.
+        """
+        Convert the `loaded` `trajectory_data` columns from json to array.
+
+        This function can only be called with data that was loaded using
+        `trajec=True` as an argument, otherwise it raises an error.
 
         Warning: this modifies the DataFrames in-place.
 
         """
+        if not self._trajec:
+            raise ValueError('data was not loaded using trajec=True')
+
         for key, fmt in self._current_fmt.items():
             if fmt == 'json':
                 self._current_fmt[key] = 'array'
@@ -189,13 +203,24 @@ class UntidyLoader(object):
         file = self._files.get(key)
 
         if file:
-            if key not in self.loaded and self._fmt == 'csv':
-                self.loaded[key] = read_trajec_csv(file)
-                self._current_fmt[key] = 'json'
+            if key not in self.loaded:
+                # load trajectories file
+                if self._trajec:
+                    if self._fmt == 'csv':
+                        method = read_trajec_csv
+                        self._current_fmt[key] = 'json'
+                    elif self._fmt == 'feather':
+                        method = read_trajec_feather
+                        self._current_fmt[key] = 'array'
 
-            elif key not in self.loaded and self._fmt == 'feather':
-                self.loaded[key] = read_trajec_feather(file)
-                self._current_fmt[key] = 'array'
+                # load regular file
+                else:
+                    if self._fmt == 'csv':
+                        method = pd.read_csv
+                    elif self._fmt == 'feather':
+                        method = feather.read_feather
+
+                self.loaded[key] = method(file)
 
             df = self.loaded[key]
 
@@ -288,7 +313,7 @@ def read_trajec_feather(filename: str) -> pd.DataFrame:
 
 
 def previous_attempts(df: pd.DataFrame) -> pd.Series:
-    """Extract the number of previousattempts from the metadata.
+    """Extract the number of previous attempts from the metadata.
 
     Parameters
     ----------
