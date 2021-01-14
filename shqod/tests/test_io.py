@@ -26,25 +26,25 @@ class TestIO(unittest.TestCase):
             os.path.join(THIS_DIR, 'testdata2.json')
         ]
         self.csv_filename = os.path.join(THIS_DIR, 'testdata.csv')
-        df, n = read_trajec_csv(self.csv_filename, return_length=True)
+        df = read_trajec_csv(self.csv_filename)
         self.df = df
-        self.n = n
+        self.n = len(df)
         self.level_filename = os.path.join(THIS_DIR, 'testleveldata.json')
 
     def test_trajecs_from_files(self):
         """Load trajectories from JSON (one per file)."""
         trajec = trajecs_from_files(self.json_filenames)
-        self.assertEqual(list(next(trajec)),
-                         [(44, 10), (44, 10), (44, 11), (44, 11), (45, 11)])
-        self.assertEqual(list(next(trajec)),
-                         [(44, 10), (44, 11), (44, 11), (44, 11), (45, 11)])
+        self.assertEqual(next(trajec).tolist(),
+                         [[44, 10], [44, 10], [44, 11], [44, 11], [45, 11]])
+        self.assertEqual(next(trajec).tolist(),
+                         [[44, 10], [44, 11], [44, 11], [44, 11], [45, 11]])
 
     def test_trajecs_from_files_lexico(self):
         """Load lexicographic trajectories from JSON (one per file)."""
         trajec = trajecs_from_files(self.json_filenames, lexico=True,
                                     grid_width=self.grid_width)
-        self.assertEqual(list(next(trajec)), [744, 744, 814, 814, 815])
-        self.assertEqual(list(next(trajec)), [744, 814, 814, 814, 815])
+        self.assertEqual(next(trajec).tolist(), [744, 744, 814, 814, 815])
+        self.assertEqual(next(trajec).tolist(), [744, 814, 814, 814, 815])
 
     def test_read_trajec_csv(self):
         """Read trajectories csv."""
@@ -53,22 +53,22 @@ class TestIO(unittest.TestCase):
     def test_trajecs_from_df(self):
         """Load trajectories from DataFrame."""
         trajec = trajecs_from_df(self.df, lexico=False)
-        self.assertEqual(list(next(trajec)),
-                         [(44, 10), (44, 10), (44, 11), (44, 11), (45, 11)])
-        self.assertEqual(list(next(trajec)),
-                         [(44, 10), (44, 11), (44, 11), (44, 11), (45, 11)])
+        self.assertEqual(next(trajec).tolist(),
+                         [[44, 10], [44, 10], [44, 11], [44, 11], [45, 11]])
+        self.assertEqual(next(trajec).tolist(),
+                         [[44, 10], [44, 11], [44, 11], [44, 11], [45, 11]])
         # I've added a duplicated line (2nd attempt)
-        self.assertEqual(list(next(trajec)),
-                         [(44, 10), (44, 11), (44, 11), (44, 11), (45, 11)])
+        self.assertEqual(next(trajec).tolist(),
+                         [[44, 10], [44, 11], [44, 11], [44, 11], [45, 11]])
 
     def test_trajecs_from_df_lexico(self):
         """Load lexicographic trajectories from DataFrame."""
         trajec = trajecs_from_df(self.df, lexico=True,
                                  grid_width=self.grid_width)
-        self.assertEqual(list(next(trajec)), [744, 744, 814, 814, 815])
-        self.assertEqual(list(next(trajec)), [744, 814, 814, 814, 815])
+        self.assertEqual(next(trajec).tolist(), [744, 744, 814, 814, 815])
+        self.assertEqual(next(trajec).tolist(), [744, 814, 814, 814, 815])
         # I've added a duplicated line (2nd attempt)
-        self.assertEqual(list(next(trajec)), [744, 814, 814, 814, 815])
+        self.assertEqual(next(trajec).tolist(), [744, 814, 814, 814, 815])
 
     def test_duplicated_attempts_keep_first(self):
         """Test dropping all but first attempt for each player."""
@@ -84,10 +84,10 @@ class TestIO(unittest.TestCase):
 
     def test_read_level_grid(self):
         """Read grid data."""
-        x, y, width, length = read_level_grid(self.level_filename)
+        coords, width, length = read_level_grid(self.level_filename)
         self.assertEqual(width, 5)
         self.assertEqual(length, 4)
-        self.assertEqual(len(x), 15)
+        self.assertEqual(coords.shape, (15, 2))
 
 
 if __name__ == '__main__':
