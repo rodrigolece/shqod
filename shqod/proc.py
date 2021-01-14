@@ -1,12 +1,13 @@
 """Calculate features from trajectories."""
 
-from typing import Tuple
+from typing import Tuple, List
 from .io import UntidyLoader, read_level_grid
 from .matrices import od_matrix, mobility_functional
 from .utils import path_length, path_curvature, path_dtb
 from .smoothing import smooth
 
 import os
+import itertools
 from functools import lru_cache
 import numpy as np
 import scipy.sparse as sp
@@ -251,3 +252,62 @@ class NormativeProcessor(TrajProcessor):
             out = pd.concat(out, ignore_index=True)
 
         return out
+
+
+def compute_percentiles(df: pd.DataFrame,
+        loader: UntidyLoader,
+        feat_types: List[str],
+        drop_sig: bool = True) -> pd.DataFrame:
+    """
+    Compute the percentile score for a set of features and a reference pop.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input data; it should contain the calculated features.
+    loader : UntidyLoader
+       The loader that get the DataFrames for the normative population; these
+       should also contain calculated features.
+    feat_types : List[str]
+        The names of the features columns to use.
+    drop_sig: bool, optional
+        Whether to ignore path signature features (default is True). This
+        option overrides any names that could be contained inside the list
+        `feat_types`.
+
+    Returns
+    -------
+    pd.DataFrame
+        The output mimics the shape of the input `df` with the original entries
+        replaced by numbers in [0, 100] that represent the percentiles.
+
+    """
+    if drop_sig:  # do not compute percentiles for path signature
+        drop_cols = filter(lambda c: c.startswith('sig'), df.columns)
+        out = df.drop(columns=drop_cols)
+    else:
+        out = df
+        
+    # the features for which a high value is bad need to be reversed
+    reverse_cols = ['len', 'curv', 'dtb', 'fro', 'inf']
+    
+    levels = df.level.unique()
+    genders = df.gender.unique()
+    
+    # percentile computation for each level and gender
+    for lvl, g in itertools.product(levels, genders):
+        idx = (out.level == lvl) & (out.gender == g)
+        
+        for i, row in out.loc[idx].iterrows():
+            ref = loader.get(lvl, g, row.age)  # for each age
+            
+            for k, col in enumerate(feat_types):
+                scores, val = ref[col], row[col]
+                if col in reverse_cols: # reverse the scores
+                    scores = -scores
+                    val = -val
+
+                out.loc[i, col] = st.percentileofscore(scores, val, kind='weak')
+                # weak corresponds to the CDF definition
+    
+    return out
