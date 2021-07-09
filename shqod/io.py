@@ -128,7 +128,11 @@ class UntidyLoader(object):
     """
 
     def __init__(
-        self, directory: str, fmt: str = "csv", trajec: bool = True
+        self,
+        directory: str,
+        fmt: str = "csv",
+        trajec: bool = True,
+        suffix: str = None,
     ) -> Dict[str, str]:
         """
         Load the untidy CSV files contained within `directory`.
@@ -153,7 +157,8 @@ class UntidyLoader(object):
         self._current_fmt = dict()  # used when the type is changed
 
         for file in os.listdir(directory):
-            match = re.search(rf"_(\d+)_\w*_(f|m).{fmt}", file)
+            pattern = rf"_(\d+)_\w*_(f|m){suffix if suffix is not None else ''}.{fmt}"
+            match = re.search(pattern, file)
             if match:
                 lvl, gender = match.groups()
                 key = (int(lvl), gender)
@@ -181,7 +186,7 @@ class UntidyLoader(object):
 
         return None
 
-    def get(self, level: int, gender: str, age: int = None) -> pd.DataFrame:
+    def get(self, level: int, gender: str, age: Union[int, str] = None) -> pd.DataFrame:
         """
         Get the DataFrame for a given level, gender and age.
 
@@ -193,13 +198,30 @@ class UntidyLoader(object):
         ----------
         level : int
         gender : {'f', 'm'}
-        age : int, optional
+        age : int or str, optional
+            If str should be provided as 'low:high' where low and high are
+            inclusive.
 
         Returns
         -------
         pd.DataFrame
 
         """
+        assert type(age) in (int, str) or age is None, "invalid type for age"
+
+        if isinstance(age, str):
+            pattern = r"^(\d*):(\d*)$"
+            match = re.search(pattern, age)
+            if match:
+                low, high = match.groups()
+                low = 0 if low == "" else int(low)
+                high = 99 if high == "" else int(high)
+            else:
+                raise ValueError("invalid format for age")
+
+        elif isinstance(age, int):
+            low, high = age, age
+
         key = (level, gender)
         file = self._files.get(key)
 
@@ -226,7 +248,10 @@ class UntidyLoader(object):
             df = self.loaded[key]
 
             # if age was passed as argument, filter
-            out = df.loc[df.age == age] if age else df
+            if age is not None:
+                out = df.loc[(df.age >= low) & (df.age <= high)]
+            else:
+                out = df
 
         else:
             raise FileNotFoundError
@@ -508,16 +533,11 @@ def read_level_grid(
         The width and length of the levels
     flag_coords : np.array, optional
         The coordinates of the flags (checkpoints). NB: the order in which
-        the points are stored is not the order in which they shoulb be
-        visited, and the order in `flag_coords` cannot be used.
+        the points are stored is not the order in which they should be
+        visited, and the order in `flag_coords` cannot be guaranteed.
 
     """
-    assert filename.endswith(".json"), "error: invalid file type"
-
-    with open(filename, "r") as f:
-        data = json.loads(f.read())
-        assert "fixed" in data.keys(), "error: missing key `fixed`"
-        data = data["fixed"]
+    data = _open_level_file(filename)
 
     wd, lg = data["grid_width"], data["grid_length"]
     grid = np.array(data["grid_data"]).reshape((wd, lg), order="F")
@@ -525,3 +545,58 @@ def read_level_grid(
     flag_coords = np.array([(d["x"], d["y"]) for d in data["flags"]])
 
     return (coords, wd, lg, flag_coords) if return_flags else (coords, wd, lg)
+
+
+def read_level_size(filename: str) -> Tuple[int, int]:
+    """Short summary.
+
+    Parameters
+    ----------
+    filename : str
+        The name of the json file.
+
+    Returns
+    -------
+    width, length : int, int
+        The width and length of the levels
+
+    """
+    data = _open_level_file(filename)
+
+    return data["grid_width"], data["grid_length"]
+
+
+def read_level_flags(filename: str) -> Tuple[np.array, int, int]:
+    """Short summary.
+
+    Parameters
+    ----------
+    filename : str
+        The name of the json file.
+
+    Returns
+    -------
+    flag_coords : np.array
+        The coordinates of the flags (checkpoints). NB: the order in which
+        the points are stored is not the order in which they should be
+        visited, and the order in `flag_coords` cannot be guaranteed.
+
+    """
+    data = _open_level_file(filename)
+
+    return np.array([(d["x"], d["y"]) for d in data["flags"]])
+
+
+def _open_level_file(filename: str) -> Dict:
+    """Load the data in a level json file."""
+
+    assert (ext := os.path.splitext(filename)[1]) in (
+        ".json",
+    ), f"unsupported format: {ext}"
+
+    with open(filename, "r") as f:
+        data = json.loads(f.read())
+        assert "fixed" in data.keys(), "error: missing key `fixed`"
+        data = data["fixed"]
+
+    return data
