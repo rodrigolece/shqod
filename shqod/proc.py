@@ -51,6 +51,9 @@ class TrajProcessor(object):
     def get_curv(self, path):
         return path_curvature(path)
 
+    def get_bdy(self, path):
+        return path_bdy(path, self.grid_coords)
+
     def get_sig(self, path):
         max_sigdim = getattr(self, "max_sigdim")
 
@@ -198,14 +201,14 @@ class NormativeProcessor(TrajProcessor):
         od_mat = self._od_matrix_from_path(path)
         return np.linalg.norm((self.normative_mat - od_mat).toarray(), "fro")
 
-    def get_inf(self, path):
+    def get_sup(self, path):
         if self.normative_mat is None:
             raise Exception("normative OD matrix has not been set")
 
         od_mat = self._od_matrix_from_path(path)
         return np.linalg.norm((self.normative_mat - od_mat).toarray(), np.inf)
 
-    def get_sum_match(self, path):
+    def get_match(self, path):
         if self.normative_mat is None:
             raise Exception("normative OD matrix has not been set")
 
@@ -296,7 +299,7 @@ def compute_percentiles(
         out = df
 
     # the features for which a high value is bad need to be reversed
-    reverse_cols = ["len", "curv", "dtb", "fro", "inf"]
+    reverse_cols = ["len", "curv", "bdy", "fro", "sup"]
 
     levels = df.level.unique()
     genders = df.gender.unique()
