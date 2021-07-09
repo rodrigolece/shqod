@@ -2,7 +2,7 @@
 
 from typing import Tuple, List
 from .io import UntidyLoader, read_level_grid
-from .matrices import od_matrix, mobility_functional
+from .matrices import od_matrix, mobility_functional, visiting_order
 from .utils import path_length, path_curvature, path_dtb
 from .smoothing import smooth
 
@@ -12,6 +12,7 @@ from functools import lru_cache
 import numpy as np
 import scipy.sparse as sp
 import scipy.stats as st
+from scipy.spatial import distance_matrix
 import pandas as pd
 from esig import tosig as pathsig
 
@@ -23,16 +24,15 @@ class TrajProcessor(object):
         self.country = "uk"  # currently not used
         self.gender = gender
 
-        assert "max_sigdim" in kwargs, "hyperparameter needed: 'max_sigdim'"
-        assert "spline_res" in kwargs, "hyperparameter needed: 'spline_res'"
-        assert "grid_dir" in kwargs, "hyperparameter needed: 'grid_dir'"
+        #  assert "max_sigdim" in kwargs, "hyperparameter needed: 'max_sigdim'"
+        #  assert "spline_res" in kwargs, "hyperparameter needed: 'spline_res'"
+        #  assert "grid_dir" in kwargs, "hyperparameter needed: 'grid_dir'"
 
-        self.max_sigdim = kwargs["max_sigdim"]
-        self.spline_res = kwargs["spline_res"]
+        #  self.max_sigdim = kwargs["max_sigdim"]
+        #  self.spline_res = kwargs["spline_res"]
 
-        # Currently not needed, but perhaps later
-        # for key, val in kwargs.items():
-        #     setattr(self, key, val)
+        for key, val in kwargs.items():
+            setattr(self, key, val)
 
         if "grid_dir" in kwargs:
             grid_dir = kwargs["grid_dir"]
@@ -52,10 +52,12 @@ class TrajProcessor(object):
         return path_curvature(trajec)
 
     def get_sig(self, trajec):
-        return pathsig.stream2logsig(trajec, self.max_sigdim)
+        max_sigdim = getattr(self, "max_sigdim")
 
-    def get_dtb(self, trajec):
-        return path_dtb(trajec, self.grid_coords)
+        if max_sigdim is None:
+            raise ValueError("hyperparameter needed: 'max_sigdim'")
+
+        return pathsig.stream2logsig(trajec, self.max_sigdim)
 
     def get_smooth_features(self, df, feat_types, keys=["id"]):
         # TODO: some sort of check for the feat_types
@@ -91,6 +93,16 @@ class TrajProcessor(object):
         out = out.drop(columns="trajectory_data")
 
         return out.merge(results_df, on=keys)
+
+    def get_vo(self, trajec):
+        flag_coords = getattr(self, "flag_coords")
+        R = getattr(self, "R")
+
+        if flag_coords is None or R is None:
+            raise ValueError("hyperparameters needed: 'flag_coords' and 'R'")
+
+        # safe_mode=False for no warnings
+        return visiting_order(trajec, flag_coords, R=R, safe_mode=False)
 
 
 class NormativeProcessor(TrajProcessor):
