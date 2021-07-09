@@ -130,16 +130,16 @@ def path_length(path):
     return np.sum(np.linalg.norm(path[1:] - path[:-1], axis=1))
 
 
-def path_dtb(path, coords, invert=True, buffer=0.001):
+def path_bdy(path, coords, invert=True, buffer=0.001):
     """
-    dtb = Distance to boundary
+    bdy = Affinity to boundary
     Assume that map has 1 for filled region
     """
     # Get coordinates of filled region in the map; shape 2darray, each row is the coordinate.
     # map_filled_coords = np.vstack(np.nonzero(map)).transpose()
     dm = distance_matrix(path, coords)
-    dtb = np.sum(1 / (np.min(dm, axis=1) + buffer))
-    return dtb
+    #  dtb = np.sum(1 / (np.min(dm, axis=1) + buffer))
+    return np.sum(np.exp(-0.5 * np.power(dm, 2)))
 
 
 def linear_extend(values, res):
