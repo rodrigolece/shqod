@@ -40,28 +40,36 @@ def pvalues(df, groups, test_names, correct_gameplay=False):
         first = correc_df.loc[lvl_idx & (correc_df.group == g1)]
         second = correc_df.loc[lvl_idx & (correc_df.group == g2)]
 
-        pvals = [st.ttest_ind(first[test_names].values[:, i],
-                              second[test_names].values[:, i],
-                              equal_var=False).pvalue
-                 for i in range(nb_tests)]
+        pvals = [
+            st.ttest_ind(
+                first[test_names].values[:, i],
+                second[test_names].values[:, i],
+                equal_var=False,
+            ).pvalue
+            for i in range(nb_tests)
+        ]
         level_pvals.append([lvl] + pvals)
 
     return level_pvals
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Parse the input arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('input_file', help='file containing tidy data')
-    parser.add_argument('-g', '--groups', nargs='+',
-                        default=['e3e4', 'e3e3'],
-                        help='the label of two groups to compare')
+    parser.add_argument("input_file", help="file containing tidy data")
+    parser.add_argument(
+        "-g",
+        "--groups",
+        nargs="+",
+        default=["e3e4", "e3e3"],
+        help="the label of two groups to compare",
+    )
     args = parser.parse_args()
 
     filename = args.input_file
     groups = args.groups
-    assert filename.endswith('.csv'), 'input should be csv file'
-    assert len(groups) == 2, 'should give two groups'
+    assert filename.endswith(".csv"), "input should be csv file"
+    assert len(groups) == 2, "should give two groups"
 
     # Read the input data
     feat_df = pd.read_csv(filename)
@@ -69,10 +77,18 @@ if __name__ == '__main__':
     feat_df = feat_df.loc[idx]
 
     drop_cols = [
-        'id', 'level', 'age', 'group', 'gender', 'marital', 'education',
-        'education_yrs', 'handedness', 'diagnosis'
+        "id",
+        "level",
+        "age",
+        "group",
+        "gender",
+        "marital",
+        "education",
+        "education_yrs",
+        "handedness",
+        "diagnosis",
     ]
-    test_names = feat_df.columns.drop(drop_cols, errors='ignore')
+    test_names = feat_df.columns.drop(drop_cols, errors="ignore")
 
     # Calculate the p-values with and without correction
     pvals = pvalues(feat_df, groups, test_names, correct_gameplay=False)
@@ -80,12 +96,12 @@ if __name__ == '__main__':
 
     # head = ['Level', 'Frob. norm', 'Inf. norm', 'Restrict. sum',
     #         'Mobty functional', 'Fractal dim.', 'Tot. length']
-    head = ['Level'] + test_names.tolist()
+    head = ["Level"] + test_names.tolist()
 
-    print('\np-values, no gameplay correction')
-    print(tabulate(pvals, headers=head, floatfmt='.3f'))
+    print("\np-values, no gameplay correction")
+    print(tabulate(pvals, headers=head, floatfmt=".3f"))
 
-    print('\np-values, with gameplay correction')
-    print(tabulate(correc_pvals, headers=head, floatfmt='.3f'))
+    print("\np-values, with gameplay correction")
+    print(tabulate(correc_pvals, headers=head, floatfmt=".3f"))
 
-    print('\nDone!\n')
+    print("\nDone!\n")

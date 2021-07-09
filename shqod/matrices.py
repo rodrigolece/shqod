@@ -1,6 +1,7 @@
 """Main functions to build an OD matrix and calculate the field."""
 
 from typing import Iterable, List, Tuple, Dict
+
 # from .dtypes import Trajec, LexTrajec
 
 import numpy as np
@@ -9,8 +10,7 @@ from itertools import groupby
 from operator import itemgetter
 
 
-def od_matrix(lex_trajecs: Iterable[np.array],
-              grid_size: int) -> sp.csr.csr_matrix:
+def od_matrix(lex_trajecs: Iterable[np.array], grid_size: int) -> sp.csr.csr_matrix:
     """Calculate the OD matrix from a set lexicographic trajectories.
 
     Parameters
@@ -41,10 +41,12 @@ def od_matrix(lex_trajecs: Iterable[np.array],
     return csr
 
 
-def od_matrix_brokenup(trajecs: Iterable[np.array],
-                       grid_size: Tuple[int, int],
-                       flags: np.array,
-                       R: float = 3) -> List[sp.csr.csr_matrix]:
+def od_matrix_brokenup(
+    trajecs: Iterable[np.array],
+    grid_size: Tuple[int, int],
+    flags: np.array,
+    R: float = 3,
+) -> List[sp.csr.csr_matrix]:
     """Calculate the OD matrices broken up by the visits to the checkpoints.
 
     Parameters
@@ -68,8 +70,7 @@ def od_matrix_brokenup(trajecs: Iterable[np.array],
     N = len(flags)
     width, length = grid_size
     grid_size = width * length
-    out = [sp.lil_matrix((grid_size, grid_size), dtype=int)
-           for _ in range(N)]
+    out = [sp.lil_matrix((grid_size, grid_size), dtype=int) for _ in range(N)]
 
     for arr in trajecs:
         idx = breakup_array_by_flags(arr, flags, R=3)
@@ -89,9 +90,9 @@ def od_matrix_brokenup(trajecs: Iterable[np.array],
     return out
 
 
-def breakup_array_by_flags(trajec: np.array,
-                           flags: np.array,
-                           R: float = 3) -> List[int]:
+def breakup_array_by_flags(
+    trajec: np.array, flags: np.array, R: float = 3
+) -> List[int]:
     """Find the last index of the first passage by each flag.
 
     Parameters
@@ -113,9 +114,7 @@ def breakup_array_by_flags(trajec: np.array,
     offset = 0
 
     for f in flags:
-        idx = np.where(
-            np.linalg.norm(trajec[offset:] - f, 2, axis=1) <= R
-        )[0] + offset
+        idx = np.where(np.linalg.norm(trajec[offset:] - f, 2, axis=1) <= R)[0] + offset
         max_sets = [
             max(map(itemgetter(1), g))
             for _, g in groupby(enumerate(idx), lambda ix: ix[0] - ix[1])
@@ -126,8 +125,9 @@ def breakup_array_by_flags(trajec: np.array,
     return out
 
 
-def reduce_matrix(square_mat: sp.csr.csr_matrix,
-                  return_index: bool = False) -> sp.csr.csr_matrix:
+def reduce_matrix(
+    square_mat: sp.csr.csr_matrix, return_index: bool = False
+) -> sp.csr.csr_matrix:
     """Remove all rows and columns that are simultaneously empty.
 
     Parameters
@@ -152,8 +152,9 @@ def reduce_matrix(square_mat: sp.csr.csr_matrix,
     return (reduced_mat, idx) if return_index else reduced_mat
 
 
-def calculate_field(od_mat: sp.csr.csr_matrix,
-                    grid_width: int) -> Tuple[np.array, np.array]:
+def calculate_field(
+    od_mat: sp.csr.csr_matrix, grid_width: int
+) -> Tuple[np.array, np.array]:
     """Calculate the field at each location (origin) where it is non-zero.
 
     Parameters
@@ -221,10 +222,9 @@ def field_to_dict(Xs: np.array, Fs: np.array) -> Dict[Tuple, np.array]:
     return out
 
 
-def mobility_functional(trajec: np.array,
-                        od_mat: sp.csr.csr_matrix,
-                        grid_width: int,
-                        flags: np.array = None) -> float:
+def mobility_functional(
+    trajec: np.array, od_mat: sp.csr.csr_matrix, grid_width: int, flags: np.array = None
+) -> float:
     """Short summary.
 
     Parameters
@@ -246,11 +246,8 @@ def mobility_functional(trajec: np.array,
     N = 0
 
     if isinstance(od_mat, list):
-        assert flags is not None, 'error: provide the coodinates of the flags'
-        field = [
-            field_to_dict(*calculate_field(mat, grid_width))
-            for mat in od_mat
-        ]
+        assert flags is not None, "error: provide the coodinates of the flags"
+        field = [field_to_dict(*calculate_field(mat, grid_width)) for mat in od_mat]
 
         idx = breakup_array_by_flags(trajec, flags, R=3)
 

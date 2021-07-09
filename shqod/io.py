@@ -1,6 +1,7 @@
 """Read and write data."""
 
 from typing import Tuple, Dict, Iterable, Union
+
 # from .dtypes import Trajec, LexTrajec
 
 import os
@@ -41,7 +42,7 @@ class TidyLoader(object):
 
         """
         self.loaded = dict()
-        self._current_fmt = 'json'
+        self._current_fmt = "json"
 
         for d in dirs:
             self.loaded.update(self._load_csv_dir(d))
@@ -50,14 +51,13 @@ class TidyLoader(object):
 
     def _load_csv_dir(self, directory: str) -> Dict[str, pd.DataFrame]:
         """Load csv files contained inside `directory`."""
-        files = [os.path.join(directory, x)
-                 for x in os.listdir(directory)]
+        files = [os.path.join(directory, x) for x in os.listdir(directory)]
 
         out = dict()
 
         for f in files:
             df = read_trajec_csv(f)
-            key = os.path.basename(f).replace('.csv', '')
+            key = os.path.basename(f).replace(".csv", "")
             out[key] = df
 
         return out
@@ -68,8 +68,8 @@ class TidyLoader(object):
         Warning: this modifies the DataFrames in-place.
 
         """
-        if self._current_fmt == 'json':
-            self._current_fmt = 'array'
+        if self._current_fmt == "json":
+            self._current_fmt = "array"
 
             for df in self.loaded.values():
                 json_to_array(df, inplace=True)
@@ -93,7 +93,7 @@ class TidyLoader(object):
         out = dict()
 
         for key, df in self.loaded.items():
-            idx = (df.level == level)
+            idx = df.level == level
             if gender:
                 idx = idx & (df.gender == gender)
 
@@ -126,9 +126,10 @@ class UntidyLoader(object):
         to the method `get`.
 
     """
-    def __init__(self, directory: str,
-                 fmt: str = 'csv',
-                 trajec: bool = True) -> Dict[str, str]:
+
+    def __init__(
+        self, directory: str, fmt: str = "csv", trajec: bool = True
+    ) -> Dict[str, str]:
         """
         Load the untidy CSV files contained within `directory`.
 
@@ -142,7 +143,7 @@ class UntidyLoader(object):
             trajectories (default is True).
 
         """
-        assert fmt in ('csv', 'feather'), f'error: invalid format {fmt}'
+        assert fmt in ("csv", "feather"), f"error: invalid format {fmt}"
 
         self.loaded = dict()
         self._files = dict()
@@ -152,7 +153,7 @@ class UntidyLoader(object):
         self._current_fmt = dict()  # used when the type is changed
 
         for file in os.listdir(directory):
-            match = re.search(rf'_(\d+)_\w*_(f|m).{fmt}', file)
+            match = re.search(rf"_(\d+)_\w*_(f|m).{fmt}", file)
             if match:
                 lvl, gender = match.groups()
                 key = (int(lvl), gender)
@@ -171,11 +172,11 @@ class UntidyLoader(object):
 
         """
         if not self._trajec:
-            raise ValueError('data was not loaded using trajec=True')
+            raise ValueError("data was not loaded using trajec=True")
 
         for key, fmt in self._current_fmt.items():
-            if fmt == 'json':
-                self._current_fmt[key] = 'array'
+            if fmt == "json":
+                self._current_fmt[key] = "array"
                 json_to_array(self.loaded[key], inplace=True)
 
         return None
@@ -206,18 +207,18 @@ class UntidyLoader(object):
             if key not in self.loaded:
                 # load trajectories file
                 if self._trajec:
-                    if self._fmt == 'csv':
+                    if self._fmt == "csv":
                         method = read_trajec_csv
-                        self._current_fmt[key] = 'json'
-                    elif self._fmt == 'feather':
+                        self._current_fmt[key] = "json"
+                    elif self._fmt == "feather":
                         method = read_trajec_feather
-                        self._current_fmt[key] = 'array'
+                        self._current_fmt[key] = "array"
 
                 # load regular file
                 else:
-                    if self._fmt == 'csv':
+                    if self._fmt == "csv":
                         method = pd.read_csv
-                    elif self._fmt == 'feather':
+                    elif self._fmt == "feather":
                         method = feather.read_feather
 
                 self.loaded[key] = method(file)
@@ -233,8 +234,7 @@ class UntidyLoader(object):
         return out
 
 
-def json_to_array(df: pd.DataFrame,
-                  inplace: bool = False) -> Union[pd.DataFrame, None]:
+def json_to_array(df: pd.DataFrame, inplace: bool = False) -> Union[pd.DataFrame, None]:
     """Convert the `trajectory_data` column from json to array.
 
     Parameters
@@ -245,8 +245,7 @@ def json_to_array(df: pd.DataFrame,
         return None
 
     """
-    assert 'trajectory_data' in df,\
-        'error: DataFrame does not contain trajectory data'
+    assert "trajectory_data" in df, "error: DataFrame does not contain trajectory data"
 
     if inplace:
         out = None
@@ -259,10 +258,10 @@ def json_to_array(df: pd.DataFrame,
         t = trajec(row.trajectory_data)
 
         if t is None:
-            warnings.warn('corrupted data; dropping row')
+            warnings.warn("corrupted data; dropping row")
             df.drop(i, inplace=True)
         else:
-            df.at[i, 'trajectory_data'] = t
+            df.at[i, "trajectory_data"] = t
 
     return out
 
@@ -281,8 +280,7 @@ def read_trajec_csv(filename: str) -> pd.DataFrame:
 
     """
     df = pd.read_csv(filename)
-    assert 'trajectory_data' in df,\
-        'error: file does not contain trajectory data'
+    assert "trajectory_data" in df, "error: file does not contain trajectory data"
 
     return df
 
@@ -301,13 +299,12 @@ def read_trajec_feather(filename: str) -> pd.DataFrame:
 
     """
     df = feather.read_feather(filename)
-    assert 'trajectory_data' in df,\
-        'error: file does not contain trajectory data'
+    assert "trajectory_data" in df, "error: file does not contain trajectory data"
 
     for i, row in df.iterrows():
         arr = row.trajectory_data
         N = len(arr)
-        df.at[i, 'trajectory_data'] = arr.reshape((N//2, 2), order='C')
+        df.at[i, "trajectory_data"] = arr.reshape((N // 2, 2), order="C")
 
     return df
 
@@ -327,16 +324,14 @@ def previous_attempts(df: pd.DataFrame) -> pd.Series:
         The number of previous attempts.
 
     """
-    assert 'trajectory_data' in df,\
-        'error: DataFrame does not contain trajectory data'
-    out = df.trajectory_data.apply(
-        lambda x: json.loads(x)['meta']['previous_attempts'])
-    out = out.rename('previous_attempts')
+    assert "trajectory_data" in df, "error: DataFrame does not contain trajectory data"
+    out = df.trajectory_data.apply(lambda x: json.loads(x)["meta"]["previous_attempts"])
+    out = out.rename("previous_attempts")
 
     return out
 
 
-def duplicated_attempts(df: pd.DataFrame, keep: str = 'first') -> pd.Series:
+def duplicated_attempts(df: pd.DataFrame, keep: str = "first") -> pd.Series:
     """Compute the index of the last attempt of each player.
 
     For the computation, we first extract the number of previous attempts from
@@ -364,16 +359,15 @@ def duplicated_attempts(df: pd.DataFrame, keep: str = 'first') -> pd.Series:
     >>> filtered_df = df.loc[idx]
 
     """
-    assert 'trajectory_data' in df, \
-        'error: DataFrame does not contain trajectory data'
-    assert keep in ('first', 'last'), f'error: invalid option {keep}'
+    assert "trajectory_data" in df, "error: DataFrame does not contain trajectory data"
+    assert keep in ("first", "last"), f"error: invalid option {keep}"
 
     # the series containing the number of previous attempts
     pa = previous_attempts(df)
 
     enlarged_df = pd.concat((df, pa), axis=1)
-    gby = enlarged_df.groupby('user_id')['previous_attempts']
-    idx = gby.idxmin() if keep == 'first' else gby.idxmax()
+    gby = enlarged_df.groupby("user_id")["previous_attempts"]
+    idx = gby.idxmin() if keep == "first" else gby.idxmax()
 
     return idx
 
@@ -393,22 +387,22 @@ def trajec(data: str) -> np.array:
         An Nx2 numpy array representing a trajectory.
 
     """
-    data = json.loads(data)['player']
+    data = json.loads(data)["player"]
 
     if isinstance(data, dict):
         # The trajectory is corrupted, the trajectory is a single point
         # (and usually x is None)
         out = None
     else:
-        out = map(lambda el: (el['x'], el['y']), data)
+        out = map(lambda el: (el["x"], el["y"]), data)
         out = np.array(list(out))
 
     return out
 
 
-def trajecs_from_df(df: pd.DataFrame,
-                    lexico: bool = False,
-                    grid_width: int = None) -> Iterable[np.array]:
+def trajecs_from_df(
+    df: pd.DataFrame, lexico: bool = False, grid_width: int = None
+) -> Iterable[np.array]:
     """
     Parse JSON stored in a DataFrame and return a generator with trajectories.
 
@@ -429,17 +423,17 @@ def trajecs_from_df(df: pd.DataFrame,
         default) or 2N (lexico=True; calculated as y * grid_width + x)
 
     """
-    assert 'trajectory_data' in df,\
-        'error: DataFrame does not contain trajectory data'
+    assert "trajectory_data" in df, "error: DataFrame does not contain trajectory data"
     if lexico:
-        assert grid_width is not None,\
-            'error: grid_width is needed for lexicographic trajectory'
+        assert (
+            grid_width is not None
+        ), "error: grid_width is needed for lexicographic trajectory"
 
     for i, row in df.iterrows():
         t = trajec(row.trajectory_data)
 
         if t is None:
-            warnings.warn(f'corrupted data for entry: {i}')
+            warnings.warn(f"corrupted data for entry: {i}")
             continue
         elif lexico:
             t = t[:, 1] * grid_width + t[:, 0]
@@ -455,9 +449,9 @@ def _get_iterable(x):
         return (x,)
 
 
-def trajecs_from_files(files: Iterable[str],
-                       lexico: bool = False,
-                       grid_width: int = None) -> Iterable[np.array]:
+def trajecs_from_files(
+    files: Iterable[str], lexico: bool = False, grid_width: int = None
+) -> Iterable[np.array]:
     """Parse trajectories from JSON files and return a generator.
 
     Parameters
@@ -478,11 +472,12 @@ def trajecs_from_files(files: Iterable[str],
 
     """
     if lexico:
-        assert grid_width is not None,\
-            'error: grid_width is needed for lexicographic trajectory'
+        assert (
+            grid_width is not None
+        ), "error: grid_width is needed for lexicographic trajectory"
 
     for file in _get_iterable(files):
-        with open(file, 'r') as f:
+        with open(file, "r") as f:
             t = trajec(f.read())
 
         if t is None:
@@ -493,8 +488,9 @@ def trajecs_from_files(files: Iterable[str],
         yield t
 
 
-def read_level_grid(filename: str,
-                    return_flags: bool = False) -> Tuple[np.array, int, int]:
+def read_level_grid(
+    filename: str, return_flags: bool = False
+) -> Tuple[np.array, int, int]:
     """Short summary.
 
     Parameters
@@ -516,16 +512,16 @@ def read_level_grid(filename: str,
         visited, and the order in `flag_coords` cannot be used.
 
     """
-    assert filename.endswith('.json'), 'error: invalid file type'
+    assert filename.endswith(".json"), "error: invalid file type"
 
-    with open(filename, 'r') as f:
+    with open(filename, "r") as f:
         data = json.loads(f.read())
-        assert 'fixed' in data.keys(), 'error: missing key `fixed`'
-        data = data['fixed']
+        assert "fixed" in data.keys(), "error: missing key `fixed`"
+        data = data["fixed"]
 
-    wd, lg = data['grid_width'], data['grid_length']
-    grid = np.array(data['grid_data']).reshape((wd, lg), order='F')
+    wd, lg = data["grid_width"], data["grid_length"]
+    grid = np.array(data["grid_data"]).reshape((wd, lg), order="F")
     coords = np.vstack(grid.nonzero()).T
-    flag_coords = np.array([(d['x'], d['y']) for d in data['flags']])
+    flag_coords = np.array([(d["x"], d["y"]) for d in data["flags"]])
 
     return (coords, wd, lg, flag_coords) if return_flags else (coords, wd, lg)

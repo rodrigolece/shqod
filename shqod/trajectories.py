@@ -6,9 +6,7 @@ from .dtypes import Trajec, MatTrajec, BoxCounts
 import numpy as np
 
 
-def trajec2mat(trajec: Trajec,
-               width: int,
-               length: int) -> MatTrajec:
+def trajec2mat(trajec: Trajec, width: int, length: int) -> MatTrajec:
     """Convert a trajectory (x-y) to a matrix containing non-zero elements.
 
     Parameters
@@ -63,10 +61,9 @@ def boxcounts(Z: MatTrajec, box_size: int) -> int:
     return out
 
 
-def fractalD(trajec: Trajec,
-             width: int,
-             length: int,
-             return_boxcts: bool = False) -> Tuple[int, Optional[BoxCounts]]:
+def fractalD(
+    trajec: Trajec, width: int, length: int, return_boxcts: bool = False
+) -> Tuple[int, Optional[BoxCounts]]:
     """Calculate the Fractal dimension of a trajectory.
 
     Parameters
@@ -91,7 +88,7 @@ def fractalD(trajec: Trajec,
     # Greatest power of 2 less than or equal to min size
     N = int(np.log2(min(width, length)))  # int rounds down
 
-    sizes = 2**np.arange(1, N)  # +1 so that N is included
+    sizes = 2 ** np.arange(1, N)  # +1 so that N is included
     counts = []
 
     for size in sizes:

@@ -4,12 +4,7 @@ import unittest
 import numpy as np
 import scipy.sparse as sp
 
-from shqod.matrices import (
-    od_matrix,
-    reduce_matrix,
-    calculate_field,
-    field_to_dict
-)
+from shqod.matrices import od_matrix, reduce_matrix, calculate_field, field_to_dict
 
 
 class TestIO(unittest.TestCase):
@@ -41,12 +36,7 @@ class TestIO(unittest.TestCase):
         self.assertEqual(j.tolist(), [1, 3, 4, 4, 5, 7, 8, 8])  # Ds
 
         # the small mat
-        desired = np.array([
-            [0, 2, 2, 0],
-            [0, 0, 0, 1],
-            [0, 0, 0, 2],
-            [0, 0, 0, 0]
-        ])
+        desired = np.array([[0, 2, 2, 0], [0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 0, 0]])
         self.assertTrue(np.allclose(self.small_mat.toarray(), desired))
 
     def test_reduce_matrix(self):
@@ -82,5 +72,5 @@ class TestIO(unittest.TestCase):
         pass
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

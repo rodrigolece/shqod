@@ -7,6 +7,7 @@ import sys
 Utilities for SHQ path analysis
 """
 
+
 def path_velocity(path):
     """
     No velocity consideration, assume uniform time
@@ -29,15 +30,19 @@ def path_integrate(velocity):
 
 def gaussian_2d_filter(n, step_size):
     # Odd sized
-    pre_output = abs(np.matmul(np.ones(2*n+1).reshape(-1, 1), np.arange(-n, n+1).reshape(1, -1)))
+    pre_output = abs(
+        np.matmul(
+            np.ones(2 * n + 1).reshape(-1, 1), np.arange(-n, n + 1).reshape(1, -1)
+        )
+    )
     pre_output += pre_output.transpose()
     pre_output = pre_output * pre_output
-    pre_output *= (-step_size/2)
-    output = np.exp(pre_output)/np.sqrt(2*math.pi)
+    pre_output *= -step_size / 2
+    output = np.exp(pre_output) / np.sqrt(2 * math.pi)
     return output
 
 
-def filter_pointcloud(sample, labels_in, return_detailed = False):
+def filter_pointcloud(sample, labels_in, return_detailed=False):
     """
     Filter a pointcloud by integer label
     Assume that sample is a (k x n) list where there are n dimensions, and depth is a shape (k,) ndarray encoding labels
@@ -45,36 +50,66 @@ def filter_pointcloud(sample, labels_in, return_detailed = False):
     """
     labels = list(labels_in)
     num_samples = sample.shape[0]
-    assert len(labels) == num_samples, "the number of samples must be the same as the number of depth data"
+    assert (
+        len(labels) == num_samples
+    ), "the number of samples must be the same as the number of depth data"
     unique_labels = np.unique(labels)
-    unique_labels_hor_ext = np.matmul(unique_labels.reshape(-1, 1), np.ones((1, num_samples)))
-    all_labels_vert_ext = np.matmul(np.ones((len(unique_labels) , 1)), np.array(labels).reshape(1,-1))
-    sample_binary_labels = np.equal(unique_labels_hor_ext, all_labels_vert_ext) # each column is a binary one-hot array indicating its label
+    unique_labels_hor_ext = np.matmul(
+        unique_labels.reshape(-1, 1), np.ones((1, num_samples))
+    )
+    all_labels_vert_ext = np.matmul(
+        np.ones((len(unique_labels), 1)), np.array(labels).reshape(1, -1)
+    )
+    sample_binary_labels = np.equal(
+        unique_labels_hor_ext, all_labels_vert_ext
+    )  # each column is a binary one-hot array indicating its label
     vanilla_indices = np.array(range(len(labels)))
 
     if not return_detailed:
         return [sample[sample_binary_labels[i]] for i in range(len(unique_labels))]
     else:
-        return {"points": [sample[sample_binary_labels[i]] for i in range(len(unique_labels))],
-                "indices": [vanilla_indices[sample_binary_labels[i]] for i in range(len(unique_labels))]}
+        return {
+            "points": [
+                sample[sample_binary_labels[i]] for i in range(len(unique_labels))
+            ],
+            "indices": [
+                vanilla_indices[sample_binary_labels[i]]
+                for i in range(len(unique_labels))
+            ],
+        }
 
 
-def print_progress_bar(tick, max_tick, message = "", percent_decimal = 2, ETA_ESTIMATOR = None):
+def print_progress_bar(
+    tick, max_tick, message="", percent_decimal=2, ETA_ESTIMATOR=None
+):
     proportion = tick / max_tick
-    proportion_prev = (tick-1) / max_tick
-    tick_d = math.floor((proportion) * 100 * (10**percent_decimal)) / (10**percent_decimal)
-    tick_d_prev = math.floor((proportion_prev) * 100 * (10**percent_decimal)) / (10**percent_decimal)
+    proportion_prev = (tick - 1) / max_tick
+    tick_d = math.floor((proportion) * 100 * (10 ** percent_decimal)) / (
+        10 ** percent_decimal
+    )
+    tick_d_prev = math.floor((proportion_prev) * 100 * (10 ** percent_decimal)) / (
+        10 ** percent_decimal
+    )
     if tick_d > tick_d_prev:
         tick_d_str = str(tick_d)
         tick_d_str = ("0" * (3 - (tick_d_str.find(".")))) + tick_d_str
         tick_d_str = tick_d_str + ("0" * (3 - (len(tick_d_str) - tick_d_str.find("."))))
         if ETA_ESTIMATOR != None:
             sys.stdout.write("\r" + message + " " + tick_d_str + "%")
-            sys.stdout.write(("|" + "█" * int(tick_d / 5)) + (" " * (20 - int(tick_d / 5))) + "| "
-                             + "ETA ≈ " + str(datetime.timedelta(seconds=int((max_tick - tick) * ETA_ESTIMATOR))))
+            sys.stdout.write(
+                ("|" + "█" * int(tick_d / 5))
+                + (" " * (20 - int(tick_d / 5)))
+                + "| "
+                + "ETA ≈ "
+                + str(
+                    datetime.timedelta(seconds=int((max_tick - tick) * ETA_ESTIMATOR))
+                )
+            )
         else:
             sys.stdout.write("\r" + message + tick_d_str + "%")
-            sys.stdout.write(("|" + "█" * int(tick_d / 5)) + (" " * (20 - int(tick_d / 5))) + "|")
+            sys.stdout.write(
+                ("|" + "█" * int(tick_d / 5)) + (" " * (20 - int(tick_d / 5))) + "|"
+            )
     if max_tick == tick:
         print("")
 
@@ -83,9 +118,9 @@ def path_curvature(path):
     tan = path[1:] - path[:-1]
     vel = np.linalg.norm(tan, axis=1)
     idx = vel > 0
-    tan = tan[idx] # Remove stationary points
-    vel = vel[idx] # Remove stationary points
-    tan = tan / vel[:,np.newaxis]
+    tan = tan[idx]  # Remove stationary points
+    vel = vel[idx]  # Remove stationary points
+    tan = tan / vel[:, np.newaxis]
     curv = np.linalg.norm(tan[1:] - tan[:-1], axis=1)
     total_curv = np.sum(curv)
     return total_curv
@@ -95,7 +130,7 @@ def path_length(path):
     return np.sum(np.linalg.norm(path[1:] - path[:-1], axis=1))
 
 
-def path_dtb(path, coords, invert=True, buffer = 0.001):
+def path_dtb(path, coords, invert=True, buffer=0.001):
     """
     dtb = Distance to boundary
     Assume that map has 1 for filled region
@@ -103,7 +138,7 @@ def path_dtb(path, coords, invert=True, buffer = 0.001):
     # Get coordinates of filled region in the map; shape 2darray, each row is the coordinate.
     # map_filled_coords = np.vstack(np.nonzero(map)).transpose()
     dm = distance_matrix(path, coords)
-    dtb = np.sum(1/(np.min(dm, axis=1)+buffer))
+    dtb = np.sum(1 / (np.min(dm, axis=1) + buffer))
     return dtb
 
 
@@ -112,7 +147,7 @@ def linear_extend(values, res):
     Extend values by resolution by linear interpolation (endpoint strictly inclusive)
     """
     n = values.size
-    return np.interp(np.arange(1 + (n-1) * res)/res, np.arange(n), values)
+    return np.interp(np.arange(1 + (n - 1) * res) / res, np.arange(n), values)
 
 
 """

@@ -10,7 +10,7 @@ from .io import (
     trajec,
     trajecs_from_df,
     trajecs_from_files,
-    read_level_grid
+    read_level_grid,
 )
 
 from .matrices import (
@@ -20,7 +20,7 @@ from .matrices import (
     reduce_matrix,
     calculate_field,
     field_to_dict,
-    mobility_functional
+    mobility_functional,
 )
 
 from .proc import TrajProcessor, NormativeProcessor

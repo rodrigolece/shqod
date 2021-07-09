@@ -9,7 +9,7 @@ from scipy.ndimage import gaussian_filter
 
 def smooth(trajec: Trajec, spline_res: float = 3) -> Trajec:
     """Return smooth trajectory."""
-    assert trajec.shape[1] == 2, 'trajec has the wrong shape'
+    assert trajec.shape[1] == 2, "trajec has the wrong shape"
 
     X = linear_extend(trajec[:, 0], spline_res)
     Y = linear_extend(trajec[:, 1], spline_res)
