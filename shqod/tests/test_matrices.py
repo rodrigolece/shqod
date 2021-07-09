@@ -14,7 +14,7 @@ class TestIO(unittest.TestCase):
         """To be executed before running the other tests."""
         self.grid_width = 3
         self.grid_length = 4  # assume last row is land
-        self.lex_trajecs = [[0, 0, 1, 4, 5, 8], [0, 3, 4, 7, 8]]
+        self.lex_paths = [[0, 0, 1, 4, 5, 8], [0, 3, 4, 7, 8]]
         # note 0-> 0 (diagonal entry)
 
         # 2x2 data for field
@@ -23,9 +23,9 @@ class TestIO(unittest.TestCase):
         self.small_grid_width = 2
 
     def test_od_matrix(self):
-        """Calculate OD matrix from trajectories."""
+        """Calculate OD matrix from paths."""
         n = self.grid_width * self.grid_length
-        mat = od_matrix(self.lex_trajecs, n)
+        mat = od_matrix(self.lex_paths, n)
 
         self.assertTrue(sp.isspmatrix_csr(mat))
         self.assertEqual(mat.shape, (n, n))

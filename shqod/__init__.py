@@ -3,13 +3,13 @@
 from .io import (
     TidyLoader,
     UntidyLoader,
-    read_trajec_csv,
-    read_trajec_feather,
+    read_path_csv,
+    read_path_feather,
     previous_attempts,
     duplicated_attempts,
-    trajec,
-    trajecs_from_df,
-    trajecs_from_files,
+    path,
+    paths_from_df,
+    paths_from_files,
     read_level_grid,
 )
 
@@ -25,4 +25,4 @@ from .matrices import (
 
 from .proc import TrajProcessor, NormativeProcessor
 
-from .trajectories import fractalD, trajectory_length
+from .trajectories import fractalD, path_length

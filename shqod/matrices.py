@@ -3,8 +3,6 @@
 import warnings
 from typing import Iterable, List, Tuple, Dict
 
-# from .dtypes import Trajec, LexTrajec
-
 import numpy as np
 import scipy.sparse as sp
 from scipy.spatial import distance_matrix
@@ -12,13 +10,13 @@ from itertools import groupby
 from operator import itemgetter
 
 
-def od_matrix(lex_trajecs: Iterable[np.array], grid_size: int) -> sp.csr.csr_matrix:
-    """Calculate the OD matrix from a set lexicographic trajectories.
+def od_matrix(lex_paths: Iterable[np.array], grid_size: int) -> sp.csr.csr_matrix:
+    """Calculate the OD matrix from a set lexicographic paths.
 
     Parameters
     ----------
-    lex_trajecs : Iterable[np.array]
-        The lexicographic trajectories to be used in counting the number of
+    lex_paths : Iterable[np.array]
+        The lexicographic paths to be used in counting the number of
         trips between locations.
     grid_size : int
         The size of the grid in the level calculated as `width * length`.
@@ -31,7 +29,7 @@ def od_matrix(lex_trajecs: Iterable[np.array], grid_size: int) -> sp.csr.csr_mat
     """
     out = sp.lil_matrix((grid_size, grid_size), dtype=int)
 
-    for t in lex_trajecs:
+    for t in lex_paths:
         for i, j in zip(t[:-1], t[1:]):
             out[i, j] += 1
 
@@ -44,7 +42,7 @@ def od_matrix(lex_trajecs: Iterable[np.array], grid_size: int) -> sp.csr.csr_mat
 
 
 def od_matrix_brokenup(
-    trajecs: Iterable[np.array],
+    paths: Iterable[np.array],
     grid_size: Tuple[int, int],
     flags: np.array,
     R: float = 3,
@@ -53,8 +51,8 @@ def od_matrix_brokenup(
 
     Parameters
     ----------
-    trajecs : Iterable[np.array]
-        The trajectories to be used in counting the number of
+    paths : Iterable[np.array]
+        The paths to be used in counting the number of
         trips between locations.
     grid_size : int
         The size of the grid in the level calculated as `width * length`.
@@ -74,7 +72,7 @@ def od_matrix_brokenup(
     grid_size = width * length
     out = [sp.lil_matrix((grid_size, grid_size), dtype=int) for _ in range(N)]
 
-    for arr in trajecs:
+    for arr in paths:
         idx = breakup_array_by_flags(arr, flags, R=3)
 
         for k, sub_arr in enumerate(np.split(arr, idx[:-1])):
@@ -92,15 +90,13 @@ def od_matrix_brokenup(
     return out
 
 
-def breakup_array_by_flags(
-    trajec: np.array, flags: np.array, R: float = 3
-) -> List[int]:
+def breakup_array_by_flags(path: np.array, flags: np.array, R: float = 3) -> List[int]:
     """Find the last index of the first passage by each flag.
 
     Parameters
     ----------
-    trajec : np.array
-        An array storing the trajectory.
+    path : np.array
+        An array storing the path.
     flags : np.array
         The coordinates of the flags (ordered).
     R : float
@@ -109,14 +105,14 @@ def breakup_array_by_flags(
     Returns
     -------
     List[int]
-        The list with the indices that can be used to split `trajec`.
+        The list with the indices that can be used to split `path`.
 
     """
     out = []
     offset = 0
 
     for f in flags:
-        idx = np.where(np.linalg.norm(trajec[offset:] - f, 2, axis=1) <= R)[0] + offset
+        idx = np.where(np.linalg.norm(path[offset:] - f, 2, axis=1) <= R)[0] + offset
         max_sets = [
             max(map(itemgetter(1), g))
             for _, g in groupby(enumerate(idx), lambda ix: ix[0] - ix[1])
@@ -225,21 +221,21 @@ def field_to_dict(Xs: np.array, Fs: np.array) -> Dict[Tuple, np.array]:
 
 
 def visiting_order(
-    trajec: np.array, flags: np.array, R: int = 3, safe_mode: bool = False
+    path: np.array, flags: np.array, R: int = 3, safe_mode: bool = False
 ) -> np.array:
 
     """Calculate the order in which the flags are visited.
 
-    Calling this function with the smoothened trajectories will be inefficient.
+    Calling this function with the smoothened paths will be inefficient.
 
     Parameters
     ----------
-    trajec : np.array
-        The (x, y) trajectory for which the visiting order is calculated.
+    path : np.array
+        The (x, y) path for which the visiting order is calculated.
     flags : np.array
         The (x, y) coordinates of the flags (with the right order).
     R : float, optional
-        The radius around which the trajectory is considered to have circled
+        The radius around which the path is considered to have circled
         the flags.
     safe_mode : bool, optional
         Test the fist and the last flag (default is False).
@@ -250,7 +246,7 @@ def visiting_order(
         The order in which the flags are actually visited.
 
     """
-    dmat = distance_matrix(trajec, flags)
+    dmat = distance_matrix(path, flags)
     _, j = (dmat < R).nonzero()
     out = [x[0] for x in groupby(j)]
 
@@ -263,14 +259,14 @@ def visiting_order(
 
 
 def mobility_functional(
-    trajec: np.array, od_mat: sp.csr.csr_matrix, grid_width: int, flags: np.array = None
+    path: np.array, od_mat: sp.csr.csr_matrix, grid_width: int, flags: np.array = None
 ) -> float:
     """Short summary.
 
     Parameters
     ----------
-    trajec : np.array
-        The (x, y) trajectory for which the functional is computed.
+    path : np.array
+        The (x, y) path for which the functional is computed.
     od_mat : csr_matrix
         The orgin-destination (OD) matrix to use as input.
     grid_width : int
@@ -291,9 +287,9 @@ def mobility_functional(
         assert flags is not None, "error: provide the coodinates of the flags"
         field = [field_to_dict(*calculate_field(mat, grid_width)) for mat in od_mat]
 
-        idx = breakup_array_by_flags(trajec, flags, R=3)
+        idx = breakup_array_by_flags(path, flags, R=3)
 
-        for k, sub_arr in enumerate(np.split(trajec, idx[:-1])):
+        for k, sub_arr in enumerate(np.split(path, idx[:-1])):
             for el in sub_arr:
                 Fi = field[k].get(tuple(el), np.zeros(2))
                 out += np.dot(Fi, el)
@@ -302,7 +298,7 @@ def mobility_functional(
     else:
         field = field_to_dict(*calculate_field(od_mat, grid_width))
 
-        for el in trajec:
+        for el in path:
             Fi = field.get(tuple(el), np.zeros(2))
             out += np.dot(Fi, el)
             N += 1

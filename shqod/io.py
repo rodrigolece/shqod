@@ -2,7 +2,7 @@
 
 from typing import Tuple, Dict, Iterable, Union
 
-# from .dtypes import Trajec, LexTrajec
+# from .dtypes import Path, LexPath
 
 import os
 import warnings
@@ -26,7 +26,7 @@ class TidyLoader(object):
     Attributes
     ----------
     loaded : Dict[str, pd.DataFrame]
-        The loaded trajectory DataFrames, indexed by group keys (built from
+        The loaded path DataFrames, indexed by group keys (built from
         the names of the files by removing their extension).
 
     """
@@ -56,7 +56,7 @@ class TidyLoader(object):
         out = dict()
 
         for f in files:
-            df = read_trajec_csv(f)
+            df = read_path_csv(f)
             key = os.path.basename(f).replace(".csv", "")
             out[key] = df
 
@@ -131,7 +131,7 @@ class UntidyLoader(object):
         self,
         directory: str,
         fmt: str = "csv",
-        trajec: bool = True,
+        path: bool = True,
         suffix: str = None,
     ) -> Dict[str, str]:
         """
@@ -142,9 +142,9 @@ class UntidyLoader(object):
         directory : str
         fmt : {'csv', 'feather'}
             Default is 'csv'.
-        trajec : bool
+        path : bool
             Whether the files being loaded should be treated as including
-            trajectories (default is True).
+            paths (default is True).
 
         """
         assert fmt in ("csv", "feather"), f"error: invalid format {fmt}"
@@ -152,7 +152,7 @@ class UntidyLoader(object):
         self.loaded = dict()
         self._files = dict()
         self._fmt = fmt
-        self._trajec = trajec
+        self._path = path
 
         self._current_fmt = dict()  # used when the type is changed
 
@@ -171,13 +171,13 @@ class UntidyLoader(object):
         Convert the `loaded` `trajectory_data` columns from json to array.
 
         This function can only be called with data that was loaded using
-        `trajec=True` as an argument, otherwise it raises an error.
+        `path=True` as an argument, otherwise it raises an error.
 
         Warning: this modifies the DataFrames in-place.
 
         """
-        if not self._trajec:
-            raise ValueError("data was not loaded using trajec=True")
+        if not self._path:
+            raise ValueError("data was not loaded using path=True")
 
         for key, fmt in self._current_fmt.items():
             if fmt == "json":
@@ -227,13 +227,13 @@ class UntidyLoader(object):
 
         if file:
             if key not in self.loaded:
-                # load trajectories file
-                if self._trajec:
+                # load paths file
+                if self._path:
                     if self._fmt == "csv":
-                        method = read_trajec_csv
+                        method = read_path_csv
                         self._current_fmt[key] = "json"
                     elif self._fmt == "feather":
-                        method = read_trajec_feather
+                        method = read_path_feather
                         self._current_fmt[key] = "array"
 
                 # load regular file
@@ -270,7 +270,7 @@ def json_to_array(df: pd.DataFrame, inplace: bool = False) -> Union[pd.DataFrame
         return None
 
     """
-    assert "trajectory_data" in df, "error: DataFrame does not contain trajectory data"
+    assert "trajectory_data" in df, "error: DataFrame does not contain path data"
 
     if inplace:
         out = None
@@ -280,7 +280,7 @@ def json_to_array(df: pd.DataFrame, inplace: bool = False) -> Union[pd.DataFrame
         out = df
 
     for i, row in df.iterrows():
-        t = trajec(row.trajectory_data)
+        t = path(row.trajectory_data)
 
         if t is None:
             warnings.warn("corrupted data; dropping row")
@@ -291,9 +291,9 @@ def json_to_array(df: pd.DataFrame, inplace: bool = False) -> Union[pd.DataFrame
     return out
 
 
-def read_trajec_csv(filename: str) -> pd.DataFrame:
+def read_path_csv(filename: str) -> pd.DataFrame:
     """
-    Read a csv file containing trajectory data into a DataFrame.
+    Read a csv file containing path data into a DataFrame.
 
     Parameters
     ----------
@@ -305,14 +305,14 @@ def read_trajec_csv(filename: str) -> pd.DataFrame:
 
     """
     df = pd.read_csv(filename)
-    assert "trajectory_data" in df, "error: file does not contain trajectory data"
+    assert "trajectory_data" in df, "error: file does not contain path data"
 
     return df
 
 
-def read_trajec_feather(filename: str) -> pd.DataFrame:
+def read_path_feather(filename: str) -> pd.DataFrame:
     """
-    Read a feather file containing trajectory data into a DataFrame.
+    Read a feather file containing path data into a DataFrame.
 
     Parameters
     ----------
@@ -324,7 +324,7 @@ def read_trajec_feather(filename: str) -> pd.DataFrame:
 
     """
     df = feather.read_feather(filename)
-    assert "trajectory_data" in df, "error: file does not contain trajectory data"
+    assert "trajectory_data" in df, "error: file does not contain path data"
 
     for i, row in df.iterrows():
         arr = row.trajectory_data
@@ -340,7 +340,7 @@ def previous_attempts(df: pd.DataFrame) -> pd.Series:
     Parameters
     ----------
     df : pd.DataFrame
-        A DataFrame containing trajectory data and which has repeated attempts
+        A DataFrame containing path data and which has repeated attempts
         per user.
 
     Returns
@@ -349,7 +349,7 @@ def previous_attempts(df: pd.DataFrame) -> pd.Series:
         The number of previous attempts.
 
     """
-    assert "trajectory_data" in df, "error: DataFrame does not contain trajectory data"
+    assert "trajectory_data" in df, "error: DataFrame does not contain path data"
     out = df.trajectory_data.apply(lambda x: json.loads(x)["meta"]["previous_attempts"])
     out = out.rename("previous_attempts")
 
@@ -367,7 +367,7 @@ def duplicated_attempts(df: pd.DataFrame, keep: str = "first") -> pd.Series:
     Parameters
     ----------
     df : pd.DataFrame
-        A DataFrame containing trajectory data and which has repeated attempts
+        A DataFrame containing path data and which has repeated attempts
         per user.
     keep : str, optional
         Valid options are 'first' (the default) and 'last' to decide which
@@ -384,7 +384,7 @@ def duplicated_attempts(df: pd.DataFrame, keep: str = "first") -> pd.Series:
     >>> filtered_df = df.loc[idx]
 
     """
-    assert "trajectory_data" in df, "error: DataFrame does not contain trajectory data"
+    assert "trajectory_data" in df, "error: DataFrame does not contain path data"
     assert keep in ("first", "last"), f"error: invalid option {keep}"
 
     # the series containing the number of previous attempts
@@ -397,9 +397,9 @@ def duplicated_attempts(df: pd.DataFrame, keep: str = "first") -> pd.Series:
     return idx
 
 
-def trajec(data: str) -> np.array:
+def path(data: str) -> np.array:
     """
-    Parse JSON string and return an array representing a trajectory.
+    Parse JSON string and return an array representing a path.
 
     Parameters
     ----------
@@ -409,13 +409,13 @@ def trajec(data: str) -> np.array:
     Returns
     -------
     np.array
-        An Nx2 numpy array representing a trajectory.
+        An Nx2 numpy array representing a path.
 
     """
     data = json.loads(data)["player"]
 
     if isinstance(data, dict):
-        # The trajectory is corrupted, the trajectory is a single point
+        # The path is corrupted, the path is a single point
         # (and usually x is None)
         out = None
     else:
@@ -425,11 +425,11 @@ def trajec(data: str) -> np.array:
     return out
 
 
-def trajecs_from_df(
+def paths_from_df(
     df: pd.DataFrame, lexico: bool = False, grid_width: int = None
 ) -> Iterable[np.array]:
     """
-    Parse JSON stored in a DataFrame and return a generator with trajectories.
+    Parse JSON stored in a DataFrame and return a generator with paths.
 
     Parameters
     ----------
@@ -444,18 +444,18 @@ def trajecs_from_df(
     Yields
     ------
     Iterable[np.array],
-        A generator containing trajectories of size Nx2 (lexico False,
+        A generator containing paths of size Nx2 (lexico False,
         default) or 2N (lexico=True; calculated as y * grid_width + x)
 
     """
-    assert "trajectory_data" in df, "error: DataFrame does not contain trajectory data"
+    assert "trajectory_data" in df, "error: DataFrame does not contain path data"
     if lexico:
         assert (
             grid_width is not None
-        ), "error: grid_width is needed for lexicographic trajectory"
+        ), "error: grid_width is needed for lexicographic path"
 
     for i, row in df.iterrows():
-        t = trajec(row.trajectory_data)
+        t = path(row.trajectory_data)
 
         if t is None:
             warnings.warn(f"corrupted data for entry: {i}")
@@ -468,16 +468,16 @@ def trajecs_from_df(
 
 def _get_iterable(x):
     """Used to load either a single file or a list of files."""
-    if isinstance(x, collections.Iterable) and not isinstance(x, str):
+    if isinstance(x, collections.abc.Iterable) and not isinstance(x, str):
         return x
     else:
         return (x,)
 
 
-def trajecs_from_files(
+def paths_from_files(
     files: Iterable[str], lexico: bool = False, grid_width: int = None
 ) -> Iterable[np.array]:
-    """Parse trajectories from JSON files and return a generator.
+    """Parse paths from JSON files and return a generator.
 
     Parameters
     ----------
@@ -492,18 +492,18 @@ def trajecs_from_files(
     Yields
     ------
     Iterable[np.array],
-        A generator containing trajectories of size Nx2 (lexico False,
+        A generator containing paths of size Nx2 (lexico False,
         default) or 2N (lexico=True; calculated as y * grid_width + x)
 
     """
     if lexico:
         assert (
             grid_width is not None
-        ), "error: grid_width is needed for lexicographic trajectory"
+        ), "error: grid_width is needed for lexicographic path"
 
     for file in _get_iterable(files):
         with open(file, "r") as f:
-            t = trajec(f.read())
+            t = path(f.read())
 
         if t is None:
             continue

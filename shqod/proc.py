@@ -1,9 +1,9 @@
-"""Calculate features from trajectories."""
+"""Calculate features from paths."""
 
 from typing import Tuple, List
 from .io import UntidyLoader, read_level_grid
 from .matrices import od_matrix, mobility_functional, visiting_order
-from .utils import path_length, path_curvature, path_dtb
+from .utils import path_length, path_curvature, path_bdy
 from .smoothing import smooth
 
 import os
@@ -45,19 +45,19 @@ class TrajProcessor(object):
     def __str__(self):
         return f"Processor: {self.country} - {self.gender} - {self.level}"
 
-    def get_len(self, trajec):
-        return path_length(trajec)
+    def get_len(self, path):
+        return path_length(path)
 
-    def get_curv(self, trajec):
-        return path_curvature(trajec)
+    def get_curv(self, path):
+        return path_curvature(path)
 
-    def get_sig(self, trajec):
+    def get_sig(self, path):
         max_sigdim = getattr(self, "max_sigdim")
 
         if max_sigdim is None:
             raise ValueError("hyperparameter needed: 'max_sigdim'")
 
-        return pathsig.stream2logsig(trajec, self.max_sigdim)
+        return pathsig.stream2logsig(path, self.max_sigdim)
 
     def get_smooth_features(self, df, feat_types, keys=["id"]):
         # TODO: some sort of check for the feat_types
@@ -94,7 +94,7 @@ class TrajProcessor(object):
 
         return out.merge(results_df, on=keys)
 
-    def get_vo(self, trajec):
+    def get_vo(self, path):
         flag_coords = getattr(self, "flag_coords")
         R = getattr(self, "R")
 
@@ -102,7 +102,7 @@ class TrajProcessor(object):
             raise ValueError("hyperparameters needed: 'flag_coords' and 'R'")
 
         # safe_mode=False for no warnings
-        return visiting_order(trajec, flag_coords, R=R, safe_mode=False)
+        return visiting_order(path, flag_coords, R=R, safe_mode=False)
 
 
 class NormativeProcessor(TrajProcessor):
@@ -121,7 +121,7 @@ class NormativeProcessor(TrajProcessor):
             loader.get(*key)  # pre-load the df
 
         # This is used to store a particular instance of normative od matrix
-        # as a tuple (mat, N) where N is the number of trajectories used
+        # as a tuple (mat, N) where N is the number of paths used
         self._normative_mat = None
 
         return None
@@ -182,43 +182,43 @@ class NormativeProcessor(TrajProcessor):
 
         return out
 
-    def _od_matrix_from_trajec(self, trajec):
+    def _od_matrix_from_path(self, path):
         if self.normative_mat is None:
             raise Exception("normative OD matrix has not been set")
 
         wd, lg = self.grid_width, self.grid_length
-        lex = trajec[:, 1] * wd + trajec[:, 0]
+        lex = path[:, 1] * wd + path[:, 0]
 
         return od_matrix([lex], wd * lg)
 
-    def get_fro(self, trajec):
+    def get_fro(self, path):
         if self.normative_mat is None:
             raise Exception("normative OD matrix has not been set")
 
-        od_mat = self._od_matrix_from_trajec(trajec)
+        od_mat = self._od_matrix_from_path(path)
         return np.linalg.norm((self.normative_mat - od_mat).toarray(), "fro")
 
-    def get_inf(self, trajec):
+    def get_inf(self, path):
         if self.normative_mat is None:
             raise Exception("normative OD matrix has not been set")
 
-        od_mat = self._od_matrix_from_trajec(trajec)
+        od_mat = self._od_matrix_from_path(path)
         return np.linalg.norm((self.normative_mat - od_mat).toarray(), np.inf)
 
-    def get_sum_match(self, trajec):
+    def get_sum_match(self, path):
         if self.normative_mat is None:
             raise Exception("normative OD matrix has not been set")
 
-        od_mat = self._od_matrix_from_trajec(trajec)
+        od_mat = self._od_matrix_from_path(path)
         r, s = od_mat.nonzero()
         return self.normative_mat[r, s].sum() / len(r)
 
-    def get_mob(self, trajec):
+    def get_mob(self, path):
         if self.normative_mat is None:
             raise Exception("normative OD matrix has not been set")
 
         wd = self.grid_width
-        return mobility_functional(trajec, self.normative_mat, wd)
+        return mobility_functional(path, self.normative_mat, wd)
 
     def get_coarse_features(self, df, feat_types, keys=["id"]):
         if self.normative_mat is None:

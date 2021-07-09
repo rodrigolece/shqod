@@ -1,17 +1,17 @@
-"""Utility functions for trajectories."""
+"""Utility functions for paths."""
 
 from typing import Optional, Tuple
-from .dtypes import Trajec, MatTrajec, BoxCounts
+from .dtypes import Path, BoxCounts
 
 import numpy as np
 
 
-def trajec2mat(trajec: Trajec, width: int, length: int) -> MatTrajec:
-    """Convert a trajectory (x-y) to a matrix containing non-zero elements.
+def path2mat(path: Path, width: int, length: int) -> np.ndarray:
+    """Convert a path (x-y) to a matrix containing non-zero elements.
 
     Parameters
     ----------
-    trajec : Trajec
+    path : Path
         The trjectory to convert.
     width, length : int
         The dimensions of the level grid.
@@ -19,24 +19,24 @@ def trajec2mat(trajec: Trajec, width: int, length: int) -> MatTrajec:
     Returns
     -------
     np.ndarray
-        A matrix contaning the trajectory as non-zero elements.
+        A matrix contaning the path as non-zero elements.
 
     """
     out = np.zeros((width, length), dtype=int)
 
-    for x, y in trajec:
+    for x, y in path:
         out[x, y] += 1
 
     return out
 
 
-def boxcounts(Z: MatTrajec, box_size: int) -> int:
+def boxcounts(Z: np.ndarray, box_size: int) -> int:
     """Calculate the number of non-empty boxes of given size.
 
     Parameters
     ----------
     Z : np.ndarray
-        A matrix containing the trajectory as non-zero elements
+        A matrix containing the path as non-zero elements
     box_size : int
         The size of the boxes to use.
 
@@ -62,13 +62,13 @@ def boxcounts(Z: MatTrajec, box_size: int) -> int:
 
 
 def fractalD(
-    trajec: Trajec, width: int, length: int, return_boxcts: bool = False
+    path: Path, width: int, length: int, return_boxcts: bool = False
 ) -> Tuple[int, Optional[BoxCounts]]:
-    """Calculate the Fractal dimension of a trajectory.
+    """Calculate the Fractal dimension of a path.
 
     Parameters
     ----------
-    trajec : Trajec
+    path : Path
         The trjectory to convert.
     width, length : int
         The dimensions of the level grid.
@@ -83,7 +83,7 @@ def fractalD(
         The size and number of non-empty boxes.
 
     """
-    Z = trajec2mat(trajec, width, length)
+    Z = path2mat(path, width, length)
 
     # Greatest power of 2 less than or equal to min size
     N = int(np.log2(min(width, length)))  # int rounds down
@@ -100,7 +100,7 @@ def fractalD(
     return (D, sizes, counts) if return_boxcts else D
 
 
-def trajectory_length(trajec: Trajec) -> float:
+def path_length(path: Path) -> float:
     """Calculate the total trrajectory length.
 
     Parameters
@@ -110,6 +110,6 @@ def trajectory_length(trajec: Trajec) -> float:
     -------
 
     """
-    mat = np.array(list(trajec))
+    mat = np.array(list(path))
 
     return np.linalg.norm(mat[1:] - mat[:-1], axis=1).sum()
