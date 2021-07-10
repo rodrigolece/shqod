@@ -2,8 +2,6 @@
 
 from typing import Tuple, Dict, Iterable, Union
 
-# from .dtypes import Path, LexPath
-
 import os
 import warnings
 import re
@@ -31,7 +29,7 @@ class TidyLoader(object):
 
     """
 
-    def __init__(self, *dirs):
+    def __init__(self, *dirs, path_col: str = "trajectory_data", raw: bool = False):
         """
         Load (a) directories(y) containing tidy CSV files.
 
@@ -42,41 +40,33 @@ class TidyLoader(object):
 
         """
         self.loaded = dict()
-        self._current_fmt = "json"
+        self._path_col = path_col
+        self._raw = raw
 
         for d in dirs:
-            self.loaded.update(self._load_csv_dir(d))
+            self.loaded.update(self._load_dir(d))
 
         return None
 
-    def _load_csv_dir(self, directory: str) -> Dict[str, pd.DataFrame]:
+    def _load_dir(self, directory: str) -> Dict[str, pd.DataFrame]:
         """Load csv files contained inside `directory`."""
         files = [os.path.join(directory, x) for x in os.listdir(directory)]
 
         out = dict()
 
         for f in files:
-            df = read_path_csv(f)
+            df = read_path_csv(f, self._path_col, self._raw)
             key = os.path.basename(f).replace(".csv", "")
             out[key] = df
 
         return out
 
-    def json_to_array(self) -> None:
-        """Convert the `loaded` `trajectory_data` columns from json to array.
-
-        Warning: this modifies the DataFrames in-place.
-
-        """
-        if self._current_fmt == "json":
-            self._current_fmt = "array"
-
-            for df in self.loaded.values():
-                json_to_array(df, inplace=True)
-
-        return None
-
-    def get(self, level: int, gender: str = None) -> Dict[str, pd.DataFrame]:
+    def get(
+        self,
+        level: int,
+        gender: str = None,
+        age: Union[int, str] = None,
+    ) -> Dict[str, pd.DataFrame]:
         """
         Get the portion of the DataFrames for a level and optionally gender.
 
@@ -90,12 +80,30 @@ class TidyLoader(object):
         Dict[str, pd.DataFrame]
 
         """
+        assert type(age) in (int, str) or age is None, "invalid type for age"
+
+        if isinstance(age, str):
+            pattern = r"^(\d*):(\d*)$"
+            match = re.search(pattern, age)
+            if match:
+                low, high = match.groups()
+                low = 0 if low == "" else int(low)
+                high = 99 if high == "" else int(high)
+            else:
+                raise ValueError("invalid format for age")
+
+        elif isinstance(age, int):
+            low, high = age, age
+
         out = dict()
 
         for key, df in self.loaded.items():
             idx = df.level == level
             if gender:
                 idx = idx & (df.gender == gender)
+
+            if age is not None:  # if age was passed as an argument
+                idx = idx & (df.age >= low) & (df.age <= high)
 
             if idx.any():
                 out[key] = df.loc[idx]
@@ -129,9 +137,10 @@ class UntidyLoader(object):
 
     def __init__(
         self,
-        directory: str,
+        directory: Union[str, os.PathLike],
         fmt: str = "csv",
-        path: bool = True,
+        path_col: str = "trajectory_data",
+        raw: bool = False,
         suffix: str = None,
     ) -> Dict[str, str]:
         """
@@ -142,19 +151,16 @@ class UntidyLoader(object):
         directory : str
         fmt : {'csv', 'feather'}
             Default is 'csv'.
-        path : bool
-            Whether the files being loaded should be treated as including
-            paths (default is True).
 
         """
-        assert fmt in ("csv", "feather"), f"error: invalid format {fmt}"
+        if fmt not in ("csv", "feather"):
+            raise ValueError(f"invalid format {fmt}")
 
         self.loaded = dict()
         self._files = dict()
         self._fmt = fmt
-        self._path = path
-
-        self._current_fmt = dict()  # used when the type is changed
+        self._path_col = path_col
+        self._raw = raw
 
         for file in os.listdir(directory):
             pattern = rf"_(\d+)_\w*_(f|m){suffix if suffix is not None else ''}.{fmt}"
@@ -166,29 +172,9 @@ class UntidyLoader(object):
 
         return None
 
-    def json_to_array(self) -> None:
-        """
-        Convert the `loaded` `trajectory_data` columns from json to array.
-
-        This function can only be called with data that was loaded using
-        `path=True` as an argument, otherwise it raises an error.
-
-        Warning: this modifies the DataFrames in-place.
-
-        """
-        if not self._path:
-            raise ValueError("data was not loaded using path=True")
-
-        for key, fmt in self._current_fmt.items():
-            if fmt == "json":
-                self._current_fmt[key] = "array"
-                json_to_array(self.loaded[key], inplace=True)
-
-        return None
-
     def get(self, level: int, gender: str, age: Union[int, str] = None) -> pd.DataFrame:
         """
-        Get the DataFrame for a given level, gender and age.
+        Get the DataFrame for a given level, gender and optionally age(s).
 
         The CSV files are loaded as needed for a given level and gender. The
         resulting DataFrames are stored in the attribute `loaded` and the
@@ -227,23 +213,8 @@ class UntidyLoader(object):
 
         if file:
             if key not in self.loaded:
-                # load paths file
-                if self._path:
-                    if self._fmt == "csv":
-                        method = read_path_csv
-                        self._current_fmt[key] = "json"
-                    elif self._fmt == "feather":
-                        method = read_path_feather
-                        self._current_fmt[key] = "array"
-
-                # load regular file
-                else:
-                    if self._fmt == "csv":
-                        method = pd.read_csv
-                    elif self._fmt == "feather":
-                        method = feather.read_feather
-
-                self.loaded[key] = method(file)
+                method = read_path_csv if self._fmt == "csv" else read_path_feather
+                self.loaded[key] = method(file, self._path_col, raw=self._raw)
 
             df = self.loaded[key]
 
@@ -259,45 +230,39 @@ class UntidyLoader(object):
         return out
 
 
-def json_to_array(df: pd.DataFrame, inplace: bool = False) -> Union[pd.DataFrame, None]:
-    """Convert the `trajectory_data` column from json to array.
+def convert_json_to_array(path_col: pd.Series) -> pd.Series:
+    """Convert a column from json to array.
 
     Parameters
     ----------
-    df : pd.DataFrame
-    inplace : bool, optional
-        If False, return a copy. Otherwise do operation in-place and
-        return None
+    path_col : pd.Series
 
     """
-    assert "trajectory_data" in df, "error: DataFrame does not contain path data"
 
-    if inplace:
-        out = None
+    out = []
 
-    else:
-        df = df.copy()
-        out = df
-
-    for i, row in df.iterrows():
-        t = path(row.trajectory_data)
+    for i, row in enumerate(path_col):
+        t = path(row)
 
         if t is None:
-            warnings.warn("corrupted data; dropping row")
-            df.drop(i, inplace=True)
-        else:
-            df.at[i, "trajectory_data"] = t
+            warnings.warn(f"corrupted data for entry: {i}")
 
-    return out
+        out.append(t)
+
+    return pd.Series(out)
 
 
-def read_path_csv(filename: str) -> pd.DataFrame:
+def read_path_csv(filename: str, path_col: str, raw: bool = False) -> pd.DataFrame:
     """
     Read a csv file containing path data into a DataFrame.
 
     Parameters
     ----------
     filename : str
+    path_col : str
+        Name of the column taht contains path data.
+    raw : bool, optional
+        Default is False
 
     Returns
     -------
@@ -305,18 +270,26 @@ def read_path_csv(filename: str) -> pd.DataFrame:
 
     """
     df = pd.read_csv(filename)
-    assert "trajectory_data" in df, "error: file does not contain path data"
+    series = df.get(path_col)
+
+    if series is not None and not raw:
+        if isinstance(series.iloc[0], str):
+            df[path_col] = convert_json_to_array(series)
 
     return df
 
 
-def read_path_feather(filename: str) -> pd.DataFrame:
+def read_path_feather(filename: str, path_col: str, raw: bool = False) -> pd.DataFrame:
     """
     Read a feather file containing path data into a DataFrame.
 
     Parameters
     ----------
     filename : str
+    path_col : str
+        Name of the column taht contains path data.
+    raw : bool, optional
+        Unused, here for compatibility
 
     Returns
     -------
@@ -324,12 +297,13 @@ def read_path_feather(filename: str) -> pd.DataFrame:
 
     """
     df = feather.read_feather(filename)
-    assert "trajectory_data" in df, "error: file does not contain path data"
+    series = df.get(path_col)
 
-    for i, row in df.iterrows():
-        arr = row.trajectory_data
-        N = len(arr)
-        df.at[i, "trajectory_data"] = arr.reshape((N // 2, 2), order="C")
+    if series is not None:
+        for i, row in df.iterrows():
+            arr = row[path_col]
+            N = len(arr)
+            df.at[i, path_col] = arr.reshape((N // 2, 2), order="C")
 
     return df
 
@@ -397,7 +371,7 @@ def duplicated_attempts(df: pd.DataFrame, keep: str = "first") -> pd.Series:
     return idx
 
 
-def path(data: str) -> np.array:
+def path(data: str) -> np.ndarray:
     """
     Parse JSON string and return an array representing a path.
 
@@ -449,10 +423,8 @@ def paths_from_df(
 
     """
     assert "trajectory_data" in df, "error: DataFrame does not contain path data"
-    if lexico:
-        assert (
-            grid_width is not None
-        ), "error: grid_width is needed for lexicographic path"
+    if lexico and grid_width is None:
+        raise ValueError("grid_width is needed for lexicographic path")
 
     for i, row in df.iterrows():
         t = path(row.trajectory_data)
@@ -496,10 +468,8 @@ def paths_from_files(
         default) or 2N (lexico=True; calculated as y * grid_width + x)
 
     """
-    if lexico:
-        assert (
-            grid_width is not None
-        ), "error: grid_width is needed for lexicographic path"
+    if lexico and grid_width is None:
+        raise ValueError("grid_width is needed for lexicographic path")
 
     for file in _get_iterable(files):
         with open(file, "r") as f:
@@ -516,7 +486,8 @@ def paths_from_files(
 def read_level_grid(
     filename: str, return_flags: bool = False
 ) -> Tuple[np.array, int, int]:
-    """Short summary.
+    """
+    Load the boundaries and the dimension of the grid from the JSON file of a level.
 
     Parameters
     ----------
@@ -531,10 +502,6 @@ def read_level_grid(
         The coordinates of the level landmass.
     width, length : int, int
         The width and length of the levels
-    flag_coords : np.array, optional
-        The coordinates of the flags (checkpoints). NB: the order in which
-        the points are stored is not the order in which they should be
-        visited, and the order in `flag_coords` cannot be guaranteed.
 
     """
     data = _open_level_file(filename)
@@ -542,13 +509,13 @@ def read_level_grid(
     wd, lg = data["grid_width"], data["grid_length"]
     grid = np.array(data["grid_data"]).reshape((wd, lg), order="F")
     coords = np.vstack(grid.nonzero()).T
-    flag_coords = np.array([(d["x"], d["y"]) for d in data["flags"]])
 
-    return (coords, wd, lg, flag_coords) if return_flags else (coords, wd, lg)
+    return coords, wd, lg
 
 
 def read_level_size(filename: str) -> Tuple[int, int]:
-    """Short summary.
+    """
+    Get the width and length from the JSON file of a level.
 
     Parameters
     ----------
@@ -558,7 +525,6 @@ def read_level_size(filename: str) -> Tuple[int, int]:
     Returns
     -------
     width, length : int, int
-        The width and length of the levels
 
     """
     data = _open_level_file(filename)
@@ -567,7 +533,11 @@ def read_level_size(filename: str) -> Tuple[int, int]:
 
 
 def read_level_flags(filename: str) -> Tuple[np.array, int, int]:
-    """Short summary.
+    """
+    Get the coordinates of the flags (checkpoints) from the JSON file of a level.
+
+    NB: the order in which the points are stored is not the order in which they
+    should be visited, and the order in `flag_coords` cannot be guaranteed.
 
     Parameters
     ----------
@@ -577,9 +547,6 @@ def read_level_flags(filename: str) -> Tuple[np.array, int, int]:
     Returns
     -------
     flag_coords : np.array
-        The coordinates of the flags (checkpoints). NB: the order in which
-        the points are stored is not the order in which they should be
-        visited, and the order in `flag_coords` cannot be guaranteed.
 
     """
     data = _open_level_file(filename)
@@ -590,9 +557,8 @@ def read_level_flags(filename: str) -> Tuple[np.array, int, int]:
 def _open_level_file(filename: str) -> Dict:
     """Load the data in a level json file."""
 
-    assert (ext := os.path.splitext(filename)[1]) in (
-        ".json",
-    ), f"unsupported format: {ext}"
+    if (ext := os.path.splitext(filename)[1]) != ".json":
+        raise ValueError(f"unsupported format: {ext}")
 
     with open(filename, "r") as f:
         data = json.loads(f.read())
