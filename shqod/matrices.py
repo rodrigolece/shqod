@@ -220,44 +220,6 @@ def field_to_dict(Xs: np.array, Fs: np.array) -> Dict[Tuple, np.array]:
     return out
 
 
-def visiting_order(
-    path: np.array, flags: np.array, R: int = 3, safe_mode: bool = False
-) -> np.array:
-
-    """Calculate the order in which the flags are visited.
-
-    Calling this function with the smoothened paths will be inefficient.
-
-    Parameters
-    ----------
-    path : np.array
-        The (x, y) path for which the visiting order is calculated.
-    flags : np.array
-        The (x, y) coordinates of the flags (with the right order).
-    R : float, optional
-        The radius around which the path is considered to have circled
-        the flags.
-    safe_mode : bool, optional
-        Test the fist and the last flag (default is False).
-
-    Returns
-    -------
-    Iterable
-        The order in which the flags are actually visited.
-
-    """
-    dmat = distance_matrix(path, flags)
-    _, j = (dmat < R).nonzero()
-    out = [x[0] for x in groupby(j)]
-
-    if safe_mode and out[0] != 0:
-        warnings.warn("unexpeted first flag")
-    if safe_mode and out[-1] != len(flags) - 1:
-        warnings.warn("unexpected last flag")
-
-    return out
-
-
 def mobility_functional(
     path: np.array, od_mat: sp.csr.csr_matrix, grid_width: int, flags: np.array = None
 ) -> float:

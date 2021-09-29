@@ -11,6 +11,8 @@ import pyarrow.feather as feather
 import numpy as np
 import pandas as pd
 
+from .utils import vo_correctness
+
 
 class TidyLoader(object):
     """
@@ -172,7 +174,14 @@ class UntidyLoader(object):
 
         return None
 
-    def get(self, level: int, gender: str, age: Union[int, str] = None) -> pd.DataFrame:
+    def get(
+        self,
+        level: int,
+        gender: str,
+        age: Union[int, str] = None,
+        filter_vo: bool = False,
+        verbose: bool = True,
+    ) -> pd.DataFrame:
         """
         Get the DataFrame for a given level, gender and optionally age(s).
 
@@ -215,19 +224,22 @@ class UntidyLoader(object):
             if key not in self.loaded:
                 method = read_path_csv if self._fmt == "csv" else read_path_feather
                 self.loaded[key] = method(file, self._path_col, raw=self._raw)
-
-            df = self.loaded[key]
-
-            # if age was passed as argument, filter
-            if age is not None:
-                out = df.loc[(df.age >= low) & (df.age <= high)]
-            else:
-                out = df
-
         else:
             raise FileNotFoundError
 
-        return out
+        df = self.loaded[key].copy()
+        # Copying is handy because df can be modified inplace downstream
+
+        # if age was passed as argument, filter
+        if age is not None:
+            idx = (df.age >= low) & (df.age <= high)
+            df = df.loc[idx].reset_index(drop=True)
+
+        if filter_vo:
+            idx = vo_correctness(df.vo, level, verbose=verbose)
+            df = df.loc[idx].reset_index(drop=True)
+
+        return df
 
 
 def convert_json_to_array(path_col: pd.Series) -> pd.Series:

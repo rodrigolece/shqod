@@ -1,9 +1,9 @@
 """Calculate features from paths."""
 
 from typing import Tuple, List
-from .io import UntidyLoader, read_level_grid
-from .matrices import od_matrix, mobility_functional, visiting_order
-from .utils import path_length, path_curvature, path_bdy
+from .io import UntidyLoader, read_level_grid, read_level_flags
+from .matrices import od_matrix, mobility_functional
+from .utils import path_length, path_curvature, path_bdy, visiting_order
 from .smoothing import smooth
 
 import os
@@ -42,6 +42,10 @@ class TrajProcessor(object):
             self.grid_width = wd
             self.grid_length = lg
 
+            self.flag_coords = read_level_flags(file)[::-1]
+            # NB: for levels 6, 8 and 11 I've tested the flags are in the reversed
+            # order, but I don't know if this will always hold
+
     def __str__(self):
         return f"Processor: {self.country} - {self.gender} - {self.level}"
 
@@ -52,7 +56,8 @@ class TrajProcessor(object):
         return path_curvature(path)
 
     def get_bdy(self, path):
-        return path_bdy(path, self.grid_coords)
+        bdy_scale = getattr(self, "bdy_scale", 4.0)
+        return path_bdy(path, self.grid_coords, bdy_scale)
 
     def get_sig(self, path):
         max_sigdim = getattr(self, "max_sigdim")
@@ -99,13 +104,15 @@ class TrajProcessor(object):
 
     def get_vo(self, path):
         flag_coords = getattr(self, "flag_coords")
-        R = getattr(self, "R")
+        if flag_coords is None:
+            raise ValueError("hyperparameter needed: 'flag_coords'")
 
-        if flag_coords is None or R is None:
-            raise ValueError("hyperparameters needed: 'flag_coords' and 'R'")
+        params = {"safe_mode": False}  # for no warnings
+        R = getattr(self, "R", None)
+        if R:
+            params.update({"R": R})
 
-        # safe_mode=False for no warnings
-        return visiting_order(path, flag_coords, R=R, safe_mode=False)
+        return visiting_order(path, flag_coords, **params)
 
 
 class NormativeProcessor(TrajProcessor):
@@ -266,7 +273,11 @@ class NormativeProcessor(TrajProcessor):
 
 
 def compute_percentiles(
-    df: pd.DataFrame, loader: UntidyLoader, feat_types: List[str], drop_sig: bool = True
+    df: pd.DataFrame,
+    loader: UntidyLoader,
+    feat_types: List[str],
+    filter_vo: bool = False,
+    drop_sig: bool = True,
 ) -> pd.DataFrame:
     """
     Compute the percentile score for a set of features and a reference pop.
@@ -280,6 +291,9 @@ def compute_percentiles(
        should also contain calculated features.
     feat_types : List[str]
         The names of the features columns to use.
+    filter_vo : bool
+        When set to True, we take as a reference the subset of the normative
+        population that has the correct visiting order.
     drop_sig: bool, optional
         Whether to ignore path signature features (default is True). This
         option overrides any names that could be contained inside the list
@@ -298,8 +312,10 @@ def compute_percentiles(
     else:
         out = df
 
+    # TODO: do I need to call copy()?
+
     # the features for which a high value is bad need to be reversed
-    reverse_cols = ["len", "curv", "bdy", "fro", "sup"]
+    reverse_cols = ["dur", "len", "curv", "bdy", "fro", "sup"]
 
     levels = df.level.unique()
     genders = df.gender.unique()
@@ -309,7 +325,8 @@ def compute_percentiles(
         idx = (out.level == lvl) & (out.gender == g)
 
         for i, row in out.loc[idx].iterrows():
-            ref = loader.get(lvl, g, row.age)  # for each age
+            ref = loader.get(lvl, g, row.age, filter_vo=filter_vo, verbose=False)
+            # for each age
 
             for k, col in enumerate(feat_types):
                 scores, val = ref[col], row[col]
