@@ -1,6 +1,7 @@
 from scipy.spatial import distance_matrix
 import numpy as np
 import math
+from sklearn.neighbors import KDTree
 import sys
 
 """
@@ -115,6 +116,7 @@ def print_progress_bar(
 
 
 def path_curvature(path):
+    T = path.shape[0]
     tan = path[1:] - path[:-1]
     vel = np.linalg.norm(tan, axis=1)
     idx = vel > 0
@@ -123,11 +125,24 @@ def path_curvature(path):
     tan = tan / vel[:, np.newaxis]
     curv = np.linalg.norm(tan[1:] - tan[:-1], axis=1)
     total_curv = np.sum(curv)
-    return total_curv
+    return total_curv/T
 
 
 def path_length(path):
     return np.sum(np.linalg.norm(path[1:] - path[:-1], axis=1))
+
+
+def sigmoid_ftn(x):
+    return 1/(1+np.exp(-x))
+
+
+def path_bdy(path, bdy_pts, r_in = 1.5, r_out = 5, alpha = 4):
+    T = path.shape[0] # Duration
+    tree = KDTree(bdy_pts)
+    dists, inds = tree.query(path, k=1)
+    dists_rescaled = (2*alpha)*(dists - (r_out + r_in)/2)/(r_out - r_in)
+    sigmoid_vals = sigmoid_ftn(-dists_rescaled)
+    return np.sum(sigmoid_vals)/T
 
 
 def path_bdy(path, coords, invert=True, buffer=0.001):
