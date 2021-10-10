@@ -8,6 +8,7 @@ import math
 import numpy as np
 import pandas as pd
 from scipy.spatial import distance_matrix
+from sklearn.neighbors import KDTree
 
 
 def visiting_order(
@@ -20,7 +21,7 @@ def visiting_order(
 
     Parameters
     ----------
-    path : np.array
+    path : np.ndarray
         The (x, y) path for which the visiting order is calculated.
     flags : np.array
         The (x, y) coordinates of the flags (with the right order).
@@ -62,8 +63,6 @@ def vo_correctness(vo_series, lvl, verbose=True):
     verbose : bool
         Whether to print the fraction of correct paths (default is True).
 
-    Returns
-    -------
     pd.Series
         Boolean series indicating whether the order is correct or incorrect.
 
@@ -96,8 +95,16 @@ def path_velocity(path):
     """
     No velocity consideration, assume uniform time
 
-    :param path_in: 2D Numpy input with each row being the coordinates visited
-    :return: The array of adjacent row-wise differences
+    Parameters
+    ----------
+    path : np.ndarray
+        The (x, y) path for which the visiting order is calculated.
+
+    Returns
+    -------
+    np.ndarray
+        The array of adjacent row-wise differences.
+
     """
     return path[1:] - path[:-1]
 
@@ -106,8 +113,16 @@ def path_integrate(velocity):
     """
     No velocity consideration, assume uniform time
 
-    :param path_in: 2D Numpy input with each row being the velocities at each time
-    :return: The array of cumulative sums
+    Parameters
+    ----------
+    velocity : np.ndarray
+        Each row is the velocity at each time.
+
+    Returns
+    -------
+    np.ndarray
+        The array of cumulative sums.
+
     """
     return np.vstack((np.zeros((1, velocity.shape[1])), np.cumsum(velocity, axis=0)))
 
@@ -199,31 +214,41 @@ def print_progress_bar(
 
 
 def path_curvature(path):
-    tan = path[1:] - path[:-1]
+    T = len(path)  # proxy for duration
+
+    tan = path_velocity(path)
     vel = np.linalg.norm(tan, axis=1)
     idx = vel > 0
-    tan = tan[idx]  # Remove stationary points
-    vel = vel[idx]  # Remove stationary points
+
+    # Remove stationary points
+    tan = tan[idx]
+    vel = vel[idx]
+
     tan = tan / vel[:, np.newaxis]
     curv = np.linalg.norm(tan[1:] - tan[:-1], axis=1)
     total_curv = np.sum(curv)
-    return total_curv
+
+    return total_curv / T
 
 
 def path_length(path):
-    return np.sum(np.linalg.norm(path[1:] - path[:-1], axis=1))
+    vel = path_velocity(path)
+    return np.sum(np.linalg.norm(vel, axis=1))
 
 
-def path_bdy(path, coords, invert=True, buffer=0.001):
-    """
-    bdy = Affinity to boundary
-    Assume that map has 1 for filled region
-    """
-    # Get coordinates of filled region in the map; shape 2darray, each row is the coordinate.
-    # map_filled_coords = np.vstack(np.nonzero(map)).transpose()
-    dm = distance_matrix(path, coords)
-    #  dtb = np.sum(1 / (np.min(dm, axis=1) + buffer))
-    return np.sum(np.exp(-0.5 * np.power(dm, 2)))
+def sigmoid_ftn(x):
+    return 1 / (1 + np.exp(-x))
+
+
+def path_bdy(path, bdy_pts, r_in=1.5, r_out=5, alpha=4):
+    T = len(path)  # proxy for duration
+
+    tree = KDTree(bdy_pts)
+    dists, inds = tree.query(path, k=1)
+    dists_rescaled = (2 * alpha) * (dists - (r_out + r_in) / 2) / (r_out - r_in)
+    sigmoid_vals = sigmoid_ftn(-dists_rescaled)
+
+    return np.sum(sigmoid_vals) / T
 
 
 def linear_extend(values, res):
@@ -234,29 +259,26 @@ def linear_extend(values, res):
     return np.interp(np.arange(1 + (n - 1) * res) / res, np.arange(n), values)
 
 
-"""
+#  def clus_compare(clusA, clusB):
+#      # Comparison accuracy of cluster labels
+#      num_A = clusA.size
+#      num_B = clusB.size
+#      num_label_types_A = len(set(clusA))
+#      num_label_types_B = len(set(clusB))
+#      assert num_A == num_B
+#      assert num_label_types_A == num_label_types_B
 
-def clus_compare(clusA, clusB):
-    # Comparison accuracy of cluster labels
-    num_A = clusA.size
-    num_B = clusB.size
-    num_label_types_A = len(set(clusA))
-    num_label_types_B = len(set(clusB))
-    assert num_A == num_B
-    assert num_label_types_A == num_label_types_B
+#      if num_label_types_A <= 2:
+#          return max(np.sum(clusA == clusB), np.sum(clusA == 1-clusB)) / num_A
+#      else:
+#          raise RuntimeError("Not implemented Yet")
 
-    if num_label_types_A <= 2:
-        return max(np.sum(clusA == clusB), np.sum(clusA == 1-clusB)) / num_A
-    else:
-        raise RuntimeError("Not implemented Yet")
-
-def labels_to_clus(labels):
-    # Changes labeled 1d array into the respective clusters.
-    # e.g. array([1,2,1,1,2]) into [array([0,2,3]), array([1,4])]
-    # :param labels: 1d array of labels
-    # :return: List of 1d arrays by labels
-    label_types = np.array(list(set(labels))) # Removes redundancy
-    masks = label_types.reshape(-1,1) == labels
-    clus = [np.nonzero(mask)[0] for mask in masks]
-    return clus
-"""
+#  def labels_to_clus(labels):
+#      # Changes labeled 1d array into the respective clusters.
+#      # e.g. array([1,2,1,1,2]) into [array([0,2,3]), array([1,4])]
+#      # :param labels: 1d array of labels
+#      # :return: List of 1d arrays by labels
+#      label_types = np.array(list(set(labels))) # Removes redundancy
+#      masks = label_types.reshape(-1,1) == labels
+#      clus = [np.nonzero(mask)[0] for mask in masks]
+#      return clus
