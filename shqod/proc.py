@@ -1,12 +1,7 @@
 """Calculate features from paths."""
 
-from typing import Tuple, List
-from .io import UntidyLoader, read_level_grid, read_level_flags
-from .matrices import od_matrix, mobility_functional
-from .utils import path_length, path_curvature, path_bdy, visiting_order
-from .smoothing import smooth
-
 import os
+from pathlib import Path
 import itertools
 from functools import lru_cache
 import numpy as np
@@ -15,6 +10,12 @@ import scipy.stats as st
 from scipy.spatial import distance_matrix
 import pandas as pd
 from esig import tosig as pathsig
+
+from typing import Tuple, List
+from .io import UntidyLoader, read_level_grid, read_level_flags
+from .matrices import od_matrix, mobility_functional
+from .utils import path_length, path_curvature, path_bdy, visiting_order
+from .smoothing import smooth
 
 
 class TrajProcessor(object):
@@ -35,8 +36,9 @@ class TrajProcessor(object):
             setattr(self, key, val)
 
         if "grid_dir" in kwargs:
-            grid_dir = kwargs["grid_dir"]
-            file = os.path.join(grid_dir, f"level{level:02}.json")
+            grid_dir = Path(kwargs["grid_dir"])
+
+            file = grid_dir / f"level{level:02}.json"
             coords, wd, lg = read_level_grid(file)
             self.grid_coords = coords
             self.grid_width = wd
@@ -45,6 +47,10 @@ class TrajProcessor(object):
             self.flag_coords = read_level_flags(file)[::-1]
             # NB: for levels 6, 8 and 11 I've tested the flags are in the reversed
             # order, but I don't know if this will always hold
+
+            inner_bdy_file = grid_dir / f"inner_bdy_level{level:02}.npy"
+            if os.path.isfile(inner_bdy_file):
+                self.inner_bdy = smooth(np.load(inner_bdy_file))
 
     def __str__(self):
         return f"Processor: {self.country} - {self.gender} - {self.level}"
@@ -56,8 +62,11 @@ class TrajProcessor(object):
         return path_curvature(path)
 
     def get_bdy(self, path):
-        bdy_scale = getattr(self, "bdy_scale", 4.0)
-        return path_bdy(path, self.grid_coords, bdy_scale)
+        scale = getattr(self, "bdy_scale", 4.0)
+        rin = getattr(self, "bdy_rin")  # 1.5
+        rout = getattr(self, "bdy_rout")  # 4
+
+        return path_bdy(path, self.inner_bdy, rin=rin, rout=rout, scale=scale)
 
     def get_sig(self, path):
         max_sigdim = getattr(self, "max_sigdim")
@@ -75,13 +84,14 @@ class TrajProcessor(object):
         sig_flag = False
 
         if "sig" in feat_types:
+            # TODO: remove expansion altogether, store as array
             sig_flag = True
-            sig_arr = np.zeros((N, 8))  # TODO: always 8 or depends of hp?
+            sig_arr = np.zeros((N, 8))
             feat_types = feat_types.copy()
             feat_types.pop(feat_types.index("sig"))
 
         methods = [getattr(self, f"get_{feat}") for feat in feat_types]
-        methods = list(filter(None.__ne__, methods))
+        methods = list(filter(None.__ne__, methods))  # filter out None
 
         arr = np.zeros((N, len(methods)))
         cols = feat_types.copy()
@@ -94,8 +104,9 @@ class TrajProcessor(object):
                 sig_arr[i] = self.get_sig(path)
 
         if sig_flag:
+            # TODO: remove expansion altogether, store as array
             arr = np.hstack((arr, sig_arr))
-            cols += ["sig" + str(i) for i in range(1, 9)]  # TODO: same, 8?
+            cols += ["sig" + str(i) for i in range(1, 9)]
 
         results_df = pd.DataFrame(arr, columns=cols).join(out[keys])
         out = out.drop(columns="trajectory_data")

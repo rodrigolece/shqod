@@ -225,10 +225,10 @@ def path_curvature(path):
     vel = vel[idx]
 
     tan = tan / vel[:, np.newaxis]
-    curv = np.linalg.norm(tan[1:] - tan[:-1], axis=1)
+    curv = np.linalg.norm(tan[1:] - tan[:-1], axis=1) / T
     total_curv = np.sum(curv)
 
-    return total_curv / T
+    return total_curv
 
 
 def path_length(path):
@@ -240,15 +240,16 @@ def sigmoid_ftn(x):
     return 1 / (1 + np.exp(-x))
 
 
-def path_bdy(path, bdy_pts, r_in=1.5, r_out=5, alpha=4):
+def path_bdy(path, bdy_coords, rin=1.5, rout=5, scale=4):
     T = len(path)  # proxy for duration
 
-    tree = KDTree(bdy_pts)
-    dists, inds = tree.query(path, k=1)
-    dists_rescaled = (2 * alpha) * (dists - (r_out + r_in) / 2) / (r_out - r_in)
-    sigmoid_vals = sigmoid_ftn(-dists_rescaled)
+    ds, _ = KDTree(bdy_coords).query(path, k=1)  # second out arg is indices
+    ds = ds.flatten()  # otherwise column vector
 
-    return np.sum(sigmoid_vals) / T
+    ds_rescaled = 2 * scale * (ds - (rout + rin) / 2) / (rout - rin)
+    sigmoid_vals = sigmoid_ftn(-ds_rescaled) / T
+
+    return np.sum(sigmoid_vals)
 
 
 def linear_extend(values, res):

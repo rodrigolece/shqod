@@ -5,12 +5,9 @@ from .io import (
     UntidyLoader,
     read_path_csv,
     read_path_feather,
-    previous_attempts,
-    duplicated_attempts,
-    path,
-    paths_from_df,
-    paths_from_files,
     read_level_grid,
+    read_level_size,
+    read_level_flags,
 )
 
 from .matrices import (

@@ -320,7 +320,7 @@ def read_path_feather(filename: str, path_col: str, raw: bool = False) -> pd.Dat
     return df
 
 
-def previous_attempts(df: pd.DataFrame) -> pd.Series:
+def _previous_attempts(df: pd.DataFrame) -> pd.Series:
     """Extract the number of previous attempts from the metadata.
 
     Parameters
@@ -342,7 +342,7 @@ def previous_attempts(df: pd.DataFrame) -> pd.Series:
     return out
 
 
-def duplicated_attempts(df: pd.DataFrame, keep: str = "first") -> pd.Series:
+def _duplicated_attempts(df: pd.DataFrame, keep: str = "first") -> pd.Series:
     """Compute the index of the last attempt of each player.
 
     For the computation, we first extract the number of previous attempts from
