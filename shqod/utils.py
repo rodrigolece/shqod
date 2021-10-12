@@ -4,6 +4,7 @@ Utilities for SHQ path analysis
 
 import sys
 import math
+from itertools import groupby
 
 import numpy as np
 import pandas as pd
@@ -12,8 +13,8 @@ from sklearn.neighbors import KDTree
 
 
 def visiting_order(
-    path: np.array, flags: np.array, R: int = 3, safe_mode: bool = False
-) -> np.array:
+    path: np.ndarray, flags: np.ndarray, R: int = 3, safe_mode: bool = False
+) -> np.ndarray:
 
     """Calculate the order in which the flags are visited.
 
@@ -23,7 +24,7 @@ def visiting_order(
     ----------
     path : np.ndarray
         The (x, y) path for which the visiting order is calculated.
-    flags : np.array
+    flags : np.ndarray
         The (x, y) coordinates of the flags (with the right order).
     R : float, optional
         The radius around which the path is considered to have circled
@@ -33,7 +34,7 @@ def visiting_order(
 
     Returns
     -------
-    Iterable
+    np.ndarray
         The order in which the flags are actually visited.
 
     """
@@ -46,7 +47,7 @@ def visiting_order(
     if safe_mode and out[-1] != len(flags) - 1:
         warnings.warn("unexpected last flag")
 
-    return out
+    return np.array(out)
 
 
 def vo_correctness(vo_series, lvl, verbose=True):

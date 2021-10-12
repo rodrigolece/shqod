@@ -2,12 +2,12 @@
 
 import warnings
 from typing import Iterable, List, Tuple, Dict
+from itertools import groupby
+from operator import itemgetter
 
 import numpy as np
 import scipy.sparse as sp
 from scipy.spatial import distance_matrix
-from itertools import groupby
-from operator import itemgetter
 
 
 def od_matrix(lex_paths: Iterable[np.array], grid_size: int) -> sp.csr.csr_matrix:

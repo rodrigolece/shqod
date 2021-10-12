@@ -63,8 +63,13 @@ class TrajProcessor(object):
 
     def get_bdy(self, path):
         scale = getattr(self, "bdy_scale", 4.0)
-        rin = getattr(self, "bdy_rin")  # 1.5
-        rout = getattr(self, "bdy_rout")  # 4
+        rin = getattr(self, "bdy_rin", None)
+        rout = getattr(self, "bdy_rout", None)
+
+        if rin is None:
+            raise ValueError("hyperparameter needed: 'rin'")
+        elif rout is None:
+            raise ValueError("hyperparameter needed: 'rout'")
 
         return path_bdy(path, self.inner_bdy, rin=rin, rout=rout, scale=scale)
 
@@ -77,7 +82,7 @@ class TrajProcessor(object):
         return pathsig.stream2logsig(path, self.max_sigdim)
 
     def get_smooth_features(self, df, feat_types, keys=["id"]):
-        # TODO: some sort of check for the feat_types
+        # TODO: some sort of check for the feat_type's
         out = df.reset_index(drop=True)
         N = len(out)
 
@@ -114,7 +119,8 @@ class TrajProcessor(object):
         return out.merge(results_df, on=keys)
 
     def get_vo(self, path):
-        flag_coords = getattr(self, "flag_coords")
+        flag_coords = getattr(self, "flag_coords", None)
+
         if flag_coords is None:
             raise ValueError("hyperparameter needed: 'flag_coords'")
 
@@ -165,7 +171,6 @@ class NormativeProcessor(TrajProcessor):
 
     def _get_df_for_age(self, age: int):
         df = self.loader.get(self.level, self.gender, age)
-        self.loader.json_to_array()  # we make sure to always work with arrays
         return df
 
     @lru_cache
@@ -242,12 +247,20 @@ class NormativeProcessor(TrajProcessor):
         return mobility_functional(path, self.normative_mat, wd)
 
     def get_coarse_features(self, df, feat_types, keys=["id"]):
+        # TODO: some sort of check for the feat_types
         if self.normative_mat is None:
             raise Exception("normative OD matrix has not been set")
 
-        # TODO: some sort of check for the feat_types
         out = df.reset_index(drop=True)
         N = len(out)
+
+        vo_flag = False
+
+        if "vo" in feat_types:
+            vo_flag = True
+            vo_list = []
+            feat_types = feat_types.copy()
+            feat_types.pop(feat_types.index("vo"))
 
         methods = [getattr(self, f"get_{feat}") for feat in feat_types]
         methods = list(filter(None.__ne__, methods))
@@ -259,7 +272,14 @@ class NormativeProcessor(TrajProcessor):
             path = row.trajectory_data
             arr[i] = [method(path) for method in methods]
 
+            if vo_flag:
+                vo_list.append(self.get_vo(path))
+
         results_df = pd.DataFrame(arr, columns=cols).join(out[keys])
+
+        if vo_flag:
+            results_df["vo"] = vo_list
+
         out = out.drop(columns="trajectory_data")
 
         return out.merge(results_df, on=keys)
