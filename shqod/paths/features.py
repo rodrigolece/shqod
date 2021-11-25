@@ -1,11 +1,13 @@
 """Utility functions for path features."""
 
+from typing import Tuple
+
 import numpy as np
 import scipy.sparse as sp
 from sklearn.neighbors import KDTree
 
 from shqod.utils import sigmoid_ftn
-from paths.transform import path2mat, boxcounts
+from .transform import path2mat, boxcounts
 
 
 def path_length(path: np.ndarray) -> float:
@@ -27,7 +29,7 @@ def path_length(path: np.ndarray) -> float:
     return np.linalg.norm(diff, axis=1).sum()
 
 
-def path_curvature(path: np.ndarray) -> float:
+def avg_curvature(path: np.ndarray) -> float:
     """
     Average curvature of a path.
 
@@ -58,7 +60,7 @@ def path_curvature(path: np.ndarray) -> float:
     return avg_curv
 
 
-def path_bdy(
+def bdy_affinity(
     path: np.ndarray,
     bdy_coords: np.ndarray,
     rin: float = 1.5,
@@ -114,9 +116,9 @@ def fractal_dim(path: np.ndarray, width: int, length: int) -> float:
     Z = path2mat(path, width, length)
 
     # Greatest power of 2 less than or equal to min size
-    N = int(np.log2(min(width, length)))  # int rounds down
+    pow2 = int(np.log2(min(width, length)))  # int rounds down
 
-    sizes = 2 ** np.arange(1, N)  # +1 so that N is included
+    sizes = 2 ** np.arange(1, pow2)
     counts = []
 
     for size in sizes:
@@ -129,16 +131,29 @@ def fractal_dim(path: np.ndarray, width: int, length: int) -> float:
     return dim
 
 
-def path_fro(path: np.ndarray, normative_mat: sp.csr_matrix) -> float:
-    pass
+def frobenius_deviation(
+    path: np.ndarray, grid_size: Tuple[int, int], normative_mat: sp.csr_matrix
+) -> float:
+    od_mat = od_matrix(path, grid_size)
+
+    return np.linalg.norm((normative_mat - od_mat).toarray(), "fro")
 
 
-def path_sup(path: np.ndarray, normative_mat: sp.csr_matrix) -> float:
-    pass
+def supremum_deviation(
+    path: np.ndarray, grid_size: Tuple[int, int], normative_mat: sp.csr_matrix
+) -> float:
+    od_mat = od_matrix(path, grid_size)
+
+    return np.linalg.norm((normative_mat - od_mat).toarray(), np.inf)
 
 
-def path_match(path: np.ndarray, normative_mat: sp.csr_matrix) -> float:
-    pass
+def sum_match(
+    path: np.ndarray, grid_size: Tuple[int, int], normative_mat: sp.csr_matrix
+) -> float:
+    od_mat = od_matrix(path, grid_size)
+    r, s = od_mat.nonzero()
+
+    return normative_mat[r, s].sum() / len(r)
 
 
 #  def path_integrate(velocity):

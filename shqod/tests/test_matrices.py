@@ -4,50 +4,55 @@ import unittest
 import numpy as np
 import scipy.sparse as sp
 
-from shqod.matrices import od_matrix, reduce_matrix, calculate_field, field_to_dict
+from shqod.matrices import (
+    od_matrix,
+    mobility_functional,
+    calculate_field,
+    field_to_dict,
+)
 
 
-class TestIO(unittest.TestCase):
+class TestMatrices(unittest.TestCase):
     """Test the functions in the module matrices."""
 
     def setUp(self):
         """To be executed before running the other tests."""
-        self.grid_width = 3
-        self.grid_length = 4  # assume last row is land
-        self.lex_paths = [[0, 0, 1, 4, 5, 8], [0, 3, 4, 7, 8]]
-        # note 0-> 0 (diagonal entry)
+        self.grid_size = 2, 2  # width, length
 
-        # 2x2 data for field
-        small_lex = [[0, 2, 3], [0, 1, 3], [0, 2, 3], [0, 1]]
-        self.small_mat = od_matrix(small_lex, 4)
-        self.small_grid_width = 2
+        one = np.array([[0, 0], [0, 0], [0, 1], [1, 1]])  # note 0-> 0 (diagonal entry)
+        two = np.array([[0, 0], [1, 0], [1, 1]])
+        three = np.array([[0, 0], [0, 1], [1, 1]])
+        four = np.array([[0, 0], [1, 0]])
+        self.paths = [one, two, three, four]
+        #  self.paths = [[0, 0, 2, 3], [0, 1, 3], [0, 2, 3], [0, 1]]
+
+        self.desired_od = np.array(
+            [
+                [0, 2, 2, 0],
+                [0, 0, 0, 1],
+                [0, 0, 0, 2],
+                [0, 0, 0, 0],
+            ]
+        )
 
     def test_od_matrix(self):
         """Calculate OD matrix from paths."""
-        n = self.grid_width * self.grid_length
-        mat = od_matrix(self.lex_paths, n)
+        grid_size = self.grid_size
+        mat = od_matrix(self.paths, grid_size, remove_diag=False)
+        n = np.multiply(*grid_size)
 
         self.assertTrue(sp.isspmatrix_csr(mat))
         self.assertEqual(mat.shape, (n, n))
+
+        mat = od_matrix(self.paths, grid_size, remove_diag=True)
         self.assertTrue(np.all(mat[np.diag_indices_from(mat)] == 0))
-
-        i, j = mat.nonzero()
-        self.assertEqual(i.tolist(), [0, 0, 1, 3, 4, 4, 5, 7])  # Os
-        self.assertEqual(j.tolist(), [1, 3, 4, 4, 5, 7, 8, 8])  # Ds
-
-        # the small mat
-        desired = np.array([[0, 2, 2, 0], [0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 0, 0]])
-        self.assertTrue(np.allclose(self.small_mat.toarray(), desired))
-
-    def test_reduce_matrix(self):
-        """Eliminate zero rows and zero columns."""
-        input = np.array([[1, 0, 0], [0, 0, 0], [0, 0, 1]])
-        desired_out = np.array([[1, 0], [0, 1]])
-        self.assertTrue(np.all(reduce_matrix(input) == desired_out))
+        self.assertTrue(np.allclose(mat.toarray(), self.desired_od))
 
     def test_calculate_field(self):
         """Calculate the mobility field."""
-        Xs, Fs = calculate_field(self.small_mat, self.small_grid_width)
+        width = self.grid_size[0]
+        mat = sp.csr_matrix(self.desired_od)
+        Xs, Fs = calculate_field(mat, width)
 
         # Note that test is susceptible to order of arrays
         desired_Xs = [[0, 0], [1, 0], [0, 1]]
@@ -66,9 +71,10 @@ class TestIO(unittest.TestCase):
         self.assertTrue(np.allclose(d[(1, 0)], [0, 1]))
         self.assertTrue(np.allclose(d[(0, 1)], [2, 0]))
 
-    def test_mobility_funcitonal(self):
+    def test_mobility_functional(self):
         """Calculate the mobility functional."""
         # TODO: Fill test
+        # TODO: move to paths.features
         pass
 
 

@@ -7,9 +7,9 @@ from pathlib import Path
 from shqod.io import (
     read_path_csv,
     duplicated_attempts,
-    paths_from_df,
-    paths_from_files,
     read_level_grid,
+    #  paths_from_df,
+    #  paths_from_files,
 )
 
 
@@ -30,23 +30,23 @@ class TestIO(unittest.TestCase):
         #  self.df = df
         self.level_filename = load_dir / "data_level.json"
 
-    def test_paths_from_files(self):
-        """Load paths from JSON (one per file)."""
-        path = paths_from_files(self.json_filenames)
-        self.assertEqual(
-            next(path).tolist(), [[44, 10], [44, 10], [44, 11], [44, 11], [45, 11]]
-        )
-        self.assertEqual(
-            next(path).tolist(), [[44, 10], [44, 11], [44, 11], [44, 11], [45, 11]]
-        )
+    #  def test_paths_from_files(self):
+    #      """Load paths from JSON (one per file)."""
+    #      path = paths_from_files(self.json_filenames)
+    #      self.assertEqual(
+    #          next(path).tolist(), [[44, 10], [44, 10], [44, 11], [44, 11], [45, 11]]
+    #      )
+    #      self.assertEqual(
+    #          next(path).tolist(), [[44, 10], [44, 11], [44, 11], [44, 11], [45, 11]]
+    #      )
 
-    def test_paths_from_files_lexico(self):
-        """Load lexicographic paths from JSON (one per file)."""
-        path = paths_from_files(
-            self.json_filenames, lexico=True, grid_width=self.grid_width
-        )
-        self.assertEqual(next(path).tolist(), [744, 744, 814, 814, 815])
-        self.assertEqual(next(path).tolist(), [744, 814, 814, 814, 815])
+    #  def test_paths_from_files_lexico(self):
+    #      """Load lexicographic paths from JSON (one per file)."""
+    #      path = paths_from_files(
+    #          self.json_filenames, lexico=True, grid_width=self.grid_width
+    #      )
+    #      self.assertEqual(next(path).tolist(), [744, 744, 814, 814, 815])
+    #      self.assertEqual(next(path).tolist(), [744, 814, 814, 814, 815])
 
     def test_read_path_csv(self):
         """Read paths csv."""
@@ -65,14 +65,14 @@ class TestIO(unittest.TestCase):
             paths.iloc[3].tolist(), [[44, 10], [44, 11], [44, 11], [44, 11], [45, 11]]
         )
 
-    def test_paths_from_df_lexico(self):
-        """Load lexicographic paths from DataFrame."""
-        df = read_path_csv(self.csv_filename, path_col="trajectory_data", raw=True)
-        paths = paths_from_df(df, lexico=True, grid_width=self.grid_width)
-        self.assertEqual(next(paths).tolist(), [744, 744, 814, 814, 815])
-        self.assertEqual(next(paths).tolist(), [744, 814, 814, 814, 815])
-        # I've added a duplicated line (2nd attempt)
-        self.assertEqual(next(paths).tolist(), [744, 814, 814, 814, 815])
+    #  def test_paths_from_df_lexico(self):
+    #      """Load lexicographic paths from DataFrame."""
+    #      df = read_path_csv(self.csv_filename, path_col="trajectory_data", raw=True)
+    #      paths = paths_from_df(df, lexico=True, grid_width=self.grid_width)
+    #      self.assertEqual(next(paths).tolist(), [744, 744, 814, 814, 815])
+    #      self.assertEqual(next(paths).tolist(), [744, 814, 814, 814, 815])
+    #      # I've added a duplicated line (2nd attempt)
+    #      self.assertEqual(next(paths).tolist(), [744, 814, 814, 814, 815])
 
     def test_duplicated_attempts_keep_first(self):
         """Test dropping all but first attempt for each player."""

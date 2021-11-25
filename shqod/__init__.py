@@ -9,16 +9,13 @@ from shqod.io import (
     read_level_flags,
 )
 
-from shqod.matrices import (
-    od_matrix,
-    od_matrix_brokenup,
-    breakup_array_by_flags,
-    reduce_matrix,
-    calculate_field,
-    field_to_dict,
-    mobility_functional,
-)
-
 from shqod.proc import TrajProcessor, NormativeProcessor
 
-from shqod.paths import fractal_dim, path_length
+from shqod.matrices import (
+    od_matrix,
+    mobility_functional,
+    #  od_matrix_brokenup,
+    #  breakup_by_flags,
+)
+
+#  from shqod.paths import fractal_dim, path_length

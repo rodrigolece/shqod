@@ -11,8 +11,8 @@ from shqod.utils import _get_iterable
 
 
 def od_matrix(
-    lex_paths: Iterable[np.ndarray],
-    grid_size: int,
+    paths: Iterable[np.ndarray],
+    grid_size: Tuple[int, int],
     remove_diag: bool = False,
 ) -> sp.csr_matrix:
     """
@@ -20,11 +20,10 @@ def od_matrix(
 
     Parameters
     ----------
-    lex_paths : Iterable[np.ndarray]
-        The lexicographic paths to be used in counting the number of
-        trips between locations.
-    grid_size : int
-        The size of the grid in the level calculated as `width * length`.
+    paths : Iterable[np.ndarray]
+        The paths to be used in counting the number of trips between locations.
+    grid_size : Tuple[int, int]
+        The size of the grid (width, length).
     remove_diag : bool, optional
         Delete the entries in the diagonal (default is False).
 
@@ -34,10 +33,14 @@ def od_matrix(
         Origin-destination (OD) matrix.
 
     """
-    out = sp.lil_matrix((grid_size, grid_size), dtype=int)
+    width, length = grid_size
+    size = np.multiply(*grid_size)
+    out = sp.lil_matrix((size, size), dtype=int)
 
-    for t in _get_iterable(lex_paths):
-        for i, j in zip(t[:-1], t[1:]):
+    for t in _get_iterable(paths):
+        lex = width * t[:, 1] + t[:, 0]
+
+        for i, j in zip(lex[:-1], lex[1:]):
             out[i, j] += 1
 
     if remove_diag:
@@ -59,10 +62,9 @@ def od_matrix_brokenup(
     Parameters
     ----------
     paths : Iterable[np.ndarray]
-        The paths to be used in counting the number of
-        trips between locations.
-    grid_size : int
-        The size of the grid in the level calculated as `width * length`.
+        The paths to be used in counting the number of trips between locations.
+    grid_size : Tuple[int, int]
+        The size of the grid (width, length).
     flags : np.ndarray
         The coordinates of the flags (ordered).
     R : float
@@ -76,10 +78,11 @@ def od_matrix_brokenup(
         List of origin-destination (OD) matrices.
 
     """
-    N = len(flags)
     width, length = grid_size
-    grid_size = width * length
-    out = [sp.lil_matrix((grid_size, grid_size), dtype=int) for _ in range(N)]
+    size = np.multiply(*grid_size)
+
+    nb_flags = len(flags)
+    out = [sp.lil_matrix((size, size), dtype=int) for _ in range(nb_flags)]
 
     for arr in _get_iterable(paths):
         idx = breakup_by_flags(arr, flags, R=R)
@@ -90,7 +93,7 @@ def od_matrix_brokenup(
             for i, j in zip(lex[:-1], lex[1:]):
                 out[k][i, j] += 1
 
-    for k in range(N):
+    for k in range(nb_flags):
         out[k] = out[k].tocsr()
 
         if remove_diag:
@@ -154,6 +157,9 @@ def calculate_field(
         The entries of the field.
 
     """
+    if not sp.issparse(od_mat):
+        raise ValueError("invalid type")
+
     i, j = od_mat.nonzero()
     r_origin = np.vstack((i % grid_width, i // grid_width)).T
     r_destination = np.vstack((j % grid_width, j // grid_width)).T

@@ -12,10 +12,18 @@ import pandas as pd
 from esig import tosig as pathsig
 
 from typing import Tuple, List
-from shqod.io import UntidyLoader, read_level_grid, read_level_flags
+from shqod.io import LevelsLoader, read_level_grid, read_level_flags
 from shqod.matrices import od_matrix, mobility_functional
-from shqod.utils import path_length, path_curvature, path_bdy, visiting_order
-from shqod.paths import smooth
+from shqod.paths import (
+    path_length,
+    avg_curvature,
+    bdy_affinity,
+    frobenius_deviation,
+    supremum_deviation,
+    sum_match,
+    visiting_order,
+    smooth,
+)
 
 
 class TrajProcessor(object):
@@ -37,6 +45,7 @@ class TrajProcessor(object):
             file = grid_dir / f"level{level:02}.json"
             coords, wd, lg = read_level_grid(file)
             self.grid_coords = coords
+            self.grid_size = (wd, lg)
             self.grid_width = wd
             self.grid_length = lg
 
@@ -55,7 +64,7 @@ class TrajProcessor(object):
         return path_length(path)
 
     def get_curv(self, path):
-        return path_curvature(path)
+        return avg_curvature(path)
 
     def get_bdy(self, path):
         scale = getattr(self, "bdy_scale", 4.0)
@@ -67,7 +76,7 @@ class TrajProcessor(object):
         elif rout is None:
             raise ValueError("hyperparameter needed: 'rout'")
 
-        return path_bdy(path, self.inner_bdy, rin=rin, rout=rout, scale=scale)
+        return bdy_affinity(path, self.inner_bdy, rin=rin, rout=rout, scale=scale)
 
     def get_sig(self, path):
         max_sigdim = getattr(self, "max_sigdim", None)
@@ -129,7 +138,7 @@ class TrajProcessor(object):
 
 
 class NormativeProcessor(TrajProcessor):
-    def __init__(self, loader: UntidyLoader, *args, **kwargs):
+    def __init__(self, loader: LevelsLoader, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.loader = loader
 
@@ -168,15 +177,10 @@ class NormativeProcessor(TrajProcessor):
 
     @lru_cache
     def normative_od_matrix_for_age(self, age: int):
-        wd, lg = self.grid_width, self.grid_length
-
         df = self._get_df_for_age(age)
         N = len(df)
 
-        lex_ts = [wd * t[:, 1] + t[:, 0] for t in df.trajectory_data]
-        od_mat = od_matrix(lex_ts, wd * lg)
-
-        return od_mat, N
+        return od_matrix(df.trajectory_data, self.grid_size), N
 
     @lru_cache
     def normative_od_matrix_window(self, centre):
@@ -201,40 +205,17 @@ class NormativeProcessor(TrajProcessor):
 
         return out
 
-    def _od_matrix_from_path(self, path):
-        wd, lg = self.grid_width, self.grid_length
-        lex = path[:, 1] * wd + path[:, 0]
-
-        return od_matrix([lex], wd * lg)
-
     def get_fro(self, path):
-        if self.normative_mat is None:
-            raise Exception("normative OD matrix has not been set")
-
-        od_mat = self._od_matrix_from_path(path)
-        return np.linalg.norm((self.normative_mat - od_mat).toarray(), "fro")
+        return frobenius_deviation(path, self.grid_size, self.normative_mat)
 
     def get_sup(self, path):
-        if self.normative_mat is None:
-            raise Exception("normative OD matrix has not been set")
-
-        od_mat = self._od_matrix_from_path(path)
-        return np.linalg.norm((self.normative_mat - od_mat).toarray(), np.inf)
+        return supremum_deviation(path, self.grid_size, self.normative_mat)
 
     def get_match(self, path):
-        if self.normative_mat is None:
-            raise Exception("normative OD matrix has not been set")
-
-        od_mat = self._od_matrix_from_path(path)
-        r, s = od_mat.nonzero()
-        return self.normative_mat[r, s].sum() / len(r)
+        return sum_match(path, self.grid_size, self.normative_mat)
 
     def get_mob(self, path):
-        if self.normative_mat is None:
-            raise Exception("normative OD matrix has not been set")
-
-        wd = self.grid_width
-        return mobility_functional(path, self.normative_mat, wd)
+        return mobility_functional(path, self.normative_mat, self.grid_width)
 
     def get_coarse_features(self, df, feat_types, keys=["id"]):
         # TODO: some sort of check for the feat_types
@@ -295,7 +276,7 @@ class NormativeProcessor(TrajProcessor):
 
 def compute_percentiles(
     df: pd.DataFrame,
-    loader: UntidyLoader,
+    loader: LevelsLoader,
     feat_types: List[str],
     filter_vo: bool = False,
     drop_sig: bool = True,
@@ -307,7 +288,7 @@ def compute_percentiles(
     ----------
     df : pd.DataFrame
         The input data; it should contain the calculated features.
-    loader : UntidyLoader
+    loader : LevelsLoader
        The loader that get the DataFrames for the normative population; these
        should also contain calculated features.
     feat_types : List[str]
