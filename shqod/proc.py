@@ -13,7 +13,7 @@ from esig import tosig as pathsig
 
 from typing import Tuple, List
 from shqod.io import LevelsLoader, read_level_grid, read_level_flags
-from shqod.matrices import od_matrix, mobility_functional
+from shqod.matrices import od_matrix
 from shqod.paths import (
     path_length,
     avg_curvature,
@@ -21,6 +21,7 @@ from shqod.paths import (
     frobenius_deviation,
     supremum_deviation,
     sum_match,
+    mobility_functional,
     visiting_order,
     smooth,
 )

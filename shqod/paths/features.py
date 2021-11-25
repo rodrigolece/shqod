@@ -7,6 +7,7 @@ import scipy.sparse as sp
 from sklearn.neighbors import KDTree
 
 from shqod.utils import sigmoid_ftn
+from shqod.matrices import breakup_by_flags, mobility_field, od_matrix
 from .transform import path2mat, boxcounts
 
 
@@ -92,9 +93,10 @@ def bdy_affinity(
     ds = ds.flatten()  # otherwise column vector
 
     ds_rescaled = 2 * scale * (ds - (rout + rin) / 2) / (rout - rin)
-    sigmoid_vals = sigmoid_ftn(-ds_rescaled) / T
+    sigmoid_vals = sigmoid_ftn(-ds_rescaled)
+    affinity = sigmoid_vals.sum() / T
 
-    return sigmoid_vals.sum()
+    return affinity
 
 
 def fractal_dim(path: np.ndarray, width: int, length: int) -> float:
@@ -134,26 +136,83 @@ def fractal_dim(path: np.ndarray, width: int, length: int) -> float:
 def frobenius_deviation(
     path: np.ndarray, grid_size: Tuple[int, int], normative_mat: sp.csr_matrix
 ) -> float:
-    od_mat = od_matrix(path, grid_size)
+    od_mat = od_matrix([path], grid_size)
+    norm = np.linalg.norm((normative_mat - od_mat).toarray(), "fro")
 
-    return np.linalg.norm((normative_mat - od_mat).toarray(), "fro")
+    return norm
 
 
 def supremum_deviation(
     path: np.ndarray, grid_size: Tuple[int, int], normative_mat: sp.csr_matrix
 ) -> float:
-    od_mat = od_matrix(path, grid_size)
+    od_mat = od_matrix([path], grid_size)
+    norm = np.linalg.norm((normative_mat - od_mat).toarray(), np.inf)
 
-    return np.linalg.norm((normative_mat - od_mat).toarray(), np.inf)
+    return norm
 
 
 def sum_match(
     path: np.ndarray, grid_size: Tuple[int, int], normative_mat: sp.csr_matrix
 ) -> float:
-    od_mat = od_matrix(path, grid_size)
+    od_mat = od_matrix([path], grid_size)
     r, s = od_mat.nonzero()
+    match = normative_mat[r, s].sum() / len(r)
 
-    return normative_mat[r, s].sum() / len(r)
+    return -match  # minus sign to reverse order
+
+
+def mobility_functional(
+    path: np.ndarray,
+    normative_mat: sp.csr_matrix,
+    grid_width: int,
+    flags: np.ndarray = None,
+) -> float:
+    """
+    Short summary.
+
+    Parameters
+    ----------
+    path : np.ndarray
+        The (x, y) path for which the functional is computed.
+    normative_mat : csr_matrix
+        The orgin-destination (OD) matrix to use as input.
+    grid_width : int
+        The width of the grid in the level.
+    flags : np.ndarray, optional
+        The (x, y) coordinates of the flags (with the right order).
+
+    Returns
+    -------
+    float
+
+    """
+    # TODO: take the computation of the field out of this function and pass
+    # as argument because it can be re-used
+
+    T = len(path)  # proxy for duration
+    out = 0.0
+
+    diff = path[1:] - path[:-1]
+
+    if isinstance(normative_mat, list):
+        assert flags is not None, "error: provide the coodinates of the flags"
+        field = [mobility_field(mat, grid_width) for mat in normative_mat]
+
+        idx = breakup_by_flags(path, flags, R=3)
+
+        for k, sub_arr in enumerate(np.split(path, idx[:-1])):
+            for el in sub_arr:
+                Fi = field[k].get(tuple(el), np.zeros(2))
+                out += np.dot(Fi, el)
+
+    else:
+        field = mobility_field(normative_mat, grid_width)
+
+        for k, el in enumerate(path[:-1]):
+            Fi = field.get(tuple(el), np.zeros(2))
+            out += np.dot(Fi, diff[k])
+
+    return -out / T  # minus sign to reverse order
 
 
 #  def path_integrate(velocity):

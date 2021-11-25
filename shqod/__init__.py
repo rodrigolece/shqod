@@ -13,9 +13,9 @@ from shqod.proc import TrajProcessor, NormativeProcessor
 
 from shqod.matrices import (
     od_matrix,
-    mobility_functional,
+    mobility_field,
     #  od_matrix_brokenup,
     #  breakup_by_flags,
 )
 
-#  from shqod.paths import fractal_dim, path_length
+#  from shqod.paths import fractal_dim, path_length, mobility_functional,

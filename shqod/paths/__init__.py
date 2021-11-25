@@ -10,4 +10,5 @@ from .features import (
     frobenius_deviation,
     supremum_deviation,
     sum_match,
+    mobility_functional,
 )

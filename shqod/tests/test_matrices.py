@@ -6,9 +6,7 @@ import scipy.sparse as sp
 
 from shqod.matrices import (
     od_matrix,
-    mobility_functional,
-    calculate_field,
-    field_to_dict,
+    mobility_field,
 )
 
 
@@ -26,7 +24,7 @@ class TestMatrices(unittest.TestCase):
         self.paths = [one, two, three, four]
         #  self.paths = [[0, 0, 2, 3], [0, 1, 3], [0, 2, 3], [0, 1]]
 
-        self.desired_od = np.array(
+        self.desired_od = sp.csr_matrix(
             [
                 [0, 2, 2, 0],
                 [0, 0, 0, 1],
@@ -46,36 +44,16 @@ class TestMatrices(unittest.TestCase):
 
         mat = od_matrix(self.paths, grid_size, remove_diag=True)
         self.assertTrue(np.all(mat[np.diag_indices_from(mat)] == 0))
-        self.assertTrue(np.allclose(mat.toarray(), self.desired_od))
+        self.assertTrue(np.allclose(mat.toarray(), self.desired_od.toarray()))
 
-    def test_calculate_field(self):
+    def test_mobility_field(self):
         """Calculate the mobility field."""
         width = self.grid_size[0]
-        mat = sp.csr_matrix(self.desired_od)
-        Xs, Fs = calculate_field(mat, width)
+        d = mobility_field(self.desired_od, width)
 
-        # Note that test is susceptible to order of arrays
-        desired_Xs = [[0, 0], [1, 0], [0, 1]]
-        desired_Fs = [[2, 2], [0, 1], [2, 0]]
-
-        self.assertTrue(np.allclose(Xs, desired_Xs))
-        self.assertTrue(np.allclose(Fs, desired_Fs))
-
-    def test_field_to_dict(self):
-        """Convert arrays that define field to dict."""
-        Xs = np.array([[0, 0], [1, 0], [0, 1]])
-        Fs = np.array([[2, 2], [0, 1], [2, 0]])
-
-        d = field_to_dict(Xs, Fs)
         self.assertTrue(np.allclose(d[(0, 0)], [2, 2]))
         self.assertTrue(np.allclose(d[(1, 0)], [0, 1]))
         self.assertTrue(np.allclose(d[(0, 1)], [2, 0]))
-
-    def test_mobility_functional(self):
-        """Calculate the mobility functional."""
-        # TODO: Fill test
-        # TODO: move to paths.features
-        pass
 
 
 if __name__ == "__main__":
