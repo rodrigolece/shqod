@@ -4,18 +4,18 @@ import os
 from pathlib import Path
 import itertools
 from functools import lru_cache
+
 import numpy as np
 import scipy.sparse as sp
 import scipy.stats as st
-from scipy.spatial import distance_matrix
 import pandas as pd
 from esig import tosig as pathsig
 
 from typing import Tuple, List
-from .io import UntidyLoader, read_level_grid, read_level_flags
-from .matrices import od_matrix, mobility_functional
-from .utils import path_length, path_curvature, path_bdy, visiting_order
-from .smoothing import smooth
+from shqod.io import UntidyLoader, read_level_grid, read_level_flags
+from shqod.matrices import od_matrix, mobility_functional
+from shqod.utils import path_length, path_curvature, path_bdy, visiting_order
+from shqod.paths import smooth
 
 
 class TrajProcessor(object):
@@ -25,11 +25,7 @@ class TrajProcessor(object):
         self.country = "uk"  # currently not used
         self.gender = gender
 
-        #  assert "max_sigdim" in kwargs, "hyperparameter needed: 'max_sigdim'"
         #  assert "spline_res" in kwargs, "hyperparameter needed: 'spline_res'"
-        #  assert "grid_dir" in kwargs, "hyperparameter needed: 'grid_dir'"
-
-        #  self.max_sigdim = kwargs["max_sigdim"]
         #  self.spline_res = kwargs["spline_res"]
 
         for key, val in kwargs.items():
@@ -74,7 +70,7 @@ class TrajProcessor(object):
         return path_bdy(path, self.inner_bdy, rin=rin, rout=rout, scale=scale)
 
     def get_sig(self, path):
-        max_sigdim = getattr(self, "max_sigdim")
+        max_sigdim = getattr(self, "max_sigdim", None)
 
         if max_sigdim is None:
             raise ValueError("hyperparameter needed: 'max_sigdim'")
@@ -147,11 +143,9 @@ class NormativeProcessor(TrajProcessor):
         if key not in loader.loaded:
             loader.get(*key)  # pre-load the df
 
-        # This is used to store a particular instance of normative od matrix
-        # as a tuple (mat, N) where N is the number of paths used
         self._normative_mat = None
-
-        return None
+        # Used to store a particular instance of normative od matrix
+        # as a tuple (mat, N) where N is the number of paths used
 
     def __str__(self):
         return f"Normative processor: {self.country} - {self.gender} - {self.level}"
@@ -167,7 +161,6 @@ class NormativeProcessor(TrajProcessor):
         N = wd * lg
         assert mat.shape == (N, N), "error: invalid dimensions for matrix"
         self._normative_mat = mat
-        return None
 
     def _get_df_for_age(self, age: int):
         df = self.loader.get(self.level, self.gender, age)
@@ -209,9 +202,6 @@ class NormativeProcessor(TrajProcessor):
         return out
 
     def _od_matrix_from_path(self, path):
-        if self.normative_mat is None:
-            raise Exception("normative OD matrix has not been set")
-
         wd, lg = self.grid_width, self.grid_length
         lex = path[:, 1] * wd + path[:, 0]
 

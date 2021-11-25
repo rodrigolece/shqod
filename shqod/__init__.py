@@ -1,8 +1,7 @@
 """shqod - Origin-Destination tools to work with the SHQ dataset."""
 
-from .io import (
-    TidyLoader,
-    UntidyLoader,
+from shqod.io import (
+    LevelsLoader,
     read_path_csv,
     read_path_feather,
     read_level_grid,
@@ -10,7 +9,7 @@ from .io import (
     read_level_flags,
 )
 
-from .matrices import (
+from shqod.matrices import (
     od_matrix,
     od_matrix_brokenup,
     breakup_array_by_flags,
@@ -20,6 +19,6 @@ from .matrices import (
     mobility_functional,
 )
 
-from .proc import TrajProcessor, NormativeProcessor
+from shqod.proc import TrajProcessor, NormativeProcessor
 
-from .trajectories import fractalD, path_length
+from shqod.paths import fractal_dim, path_length

@@ -1,69 +1,78 @@
 """Main functions to build an OD matrix and calculate the field."""
 
-import warnings
 from typing import Iterable, List, Tuple, Dict
 from itertools import groupby
 from operator import itemgetter
 
 import numpy as np
 import scipy.sparse as sp
-from scipy.spatial import distance_matrix
+
+from shqod.utils import _get_iterable
 
 
-def od_matrix(lex_paths: Iterable[np.array], grid_size: int) -> sp.csr.csr_matrix:
-    """Calculate the OD matrix from a set lexicographic paths.
+def od_matrix(
+    lex_paths: Iterable[np.ndarray],
+    grid_size: int,
+    remove_diag: bool = False,
+) -> sp.csr_matrix:
+    """
+    Calculate the OD matrix from a set lexicographic paths.
 
     Parameters
     ----------
-    lex_paths : Iterable[np.array]
+    lex_paths : Iterable[np.ndarray]
         The lexicographic paths to be used in counting the number of
         trips between locations.
     grid_size : int
         The size of the grid in the level calculated as `width * length`.
+    remove_diag : bool, optional
+        Delete the entries in the diagonal (default is False).
 
     Returns
     -------
-    sp.csr.csr_matrix
+    sp.csr_matrix
         Origin-destination (OD) matrix.
 
     """
     out = sp.lil_matrix((grid_size, grid_size), dtype=int)
 
-    for t in lex_paths:
+    for t in _get_iterable(lex_paths):
         for i, j in zip(t[:-1], t[1:]):
             out[i, j] += 1
 
-    # Remove diagonal entries
-    out[np.diag_indices_from(out)] = 0
-    csr = out.tocsr()
-    csr.eliminate_zeros()
+    if remove_diag:
+        out[np.diag_indices_from(out)] = 0
 
-    return csr
+    return out.tocsr()
 
 
 def od_matrix_brokenup(
-    paths: Iterable[np.array],
+    paths: Iterable[np.ndarray],
     grid_size: Tuple[int, int],
-    flags: np.array,
+    flags: np.ndarray,
     R: float = 3,
-) -> List[sp.csr.csr_matrix]:
-    """Calculate the OD matrices broken up by the visits to the checkpoints.
+    remove_diag: bool = False,
+) -> List[sp.csr_matrix]:
+    """
+    Calculate the OD matrices broken up by the visits to the checkpoints.
 
     Parameters
     ----------
-    paths : Iterable[np.array]
+    paths : Iterable[np.ndarray]
         The paths to be used in counting the number of
         trips between locations.
     grid_size : int
         The size of the grid in the level calculated as `width * length`.
-    flags : np.array
+    flags : np.ndarray
         The coordinates of the flags (ordered).
     R : float
         The radius to consider a checkpoint visited.
+    remove_diag : bool, optional
+        Delete the entries in the diagonal (default is False).
 
     Returns
     -------
-    List[sp.csr.csr_matrix]
+    List[sp.csr_matrix]
         List of origin-destination (OD) matrices.
 
     """
@@ -72,8 +81,8 @@ def od_matrix_brokenup(
     grid_size = width * length
     out = [sp.lil_matrix((grid_size, grid_size), dtype=int) for _ in range(N)]
 
-    for arr in paths:
-        idx = breakup_array_by_flags(arr, flags, R=3)
+    for arr in _get_iterable(paths):
+        idx = breakup_by_flags(arr, flags, R=R)
 
         for k, sub_arr in enumerate(np.split(arr, idx[:-1])):
             lex = sub_arr[:, 1] * width + sub_arr[:, 0]
@@ -81,23 +90,24 @@ def od_matrix_brokenup(
             for i, j in zip(lex[:-1], lex[1:]):
                 out[k][i, j] += 1
 
-    # Remove diagonal entries
     for k in range(N):
-        out[k][np.diag_indices_from(out[k])] = 0
         out[k] = out[k].tocsr()
-        out[k].eliminate_zeros()
+
+        if remove_diag:
+            out[k][np.diag_indices_from(out[k])] = 0
 
     return out
 
 
-def breakup_array_by_flags(path: np.array, flags: np.array, R: float = 3) -> List[int]:
-    """Find the last index of the first passage by each flag.
+def breakup_by_flags(path: np.ndarray, flags: np.ndarray, R: float = 3) -> List[int]:
+    """
+    Find the last index of the first passage by each flag.
 
     Parameters
     ----------
-    path : np.array
+    path : np.ndarray
         An array storing the path.
-    flags : np.array
+    flags : np.ndarray
         The coordinates of the flags (ordered).
     R : float
         The radius to consider a checkpoint visited.
@@ -123,37 +133,11 @@ def breakup_array_by_flags(path: np.array, flags: np.array, R: float = 3) -> Lis
     return out
 
 
-def reduce_matrix(
-    square_mat: sp.csr.csr_matrix, return_index: bool = False
-) -> sp.csr.csr_matrix:
-    """Remove all rows and columns that are simultaneously empty.
-
-    Parameters
-    ----------
-    square_mat : csr_matrix
-        Input matrix.
-    return_index : bool
-        If True, also return the indices of `square_mat` that were kept.
-
-    Returns
-    -------
-    reduced_mat : sp.csr_matrix
-        A square matrix that has the zero rows and columns removed.
-    idx : np.array, optional
-        The index of the rows and columns that were kept
-
-    """
-    i, j = square_mat.nonzero()
-    idx = sorted(set(i).union(set(j)))  # sorted converts to list
-    reduced_mat = square_mat[idx, :][:, idx]
-
-    return (reduced_mat, idx) if return_index else reduced_mat
-
-
 def calculate_field(
-    od_mat: sp.csr.csr_matrix, grid_width: int
-) -> Tuple[np.array, np.array]:
-    """Calculate the field at each location (origin) where it is non-zero.
+    od_mat: sp.csr_matrix, grid_width: int
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Calculate the field at each location (origin) where it is non-zero.
 
     Parameters
     ----------
@@ -164,9 +148,9 @@ def calculate_field(
 
     Returns
     -------
-    Xs : np.array
+    Xs : np.ndarray
         The coordinates of the non-zero entries of the field.
-    Fs : np.array
+    Fs : np.ndarray
         The entries of the field.
 
     """
@@ -196,19 +180,20 @@ def calculate_field(
     return Xs, Fs
 
 
-def field_to_dict(Xs: np.array, Fs: np.array) -> Dict[Tuple, np.array]:
-    """Convert array summarising Field into dict.
+def field_to_dict(Xs: np.ndarray, Fs: np.ndarray) -> Dict[Tuple, np.ndarray]:
+    """
+    Convert array summarising Field into dict.
 
     Parameters
     ----------
-    Xs : np.array
+    Xs : np.ndarray
         The array to use as keys (stores as rows).
-    Fs : np.array
+    Fs : np.ndarray
         The values of the field that will be dict values.
 
     Returns
     -------
-    Dict[Tuple, np.array]
+    Dict[Tuple, np.ndarray]
         A dictionary that is indixed by the values in Xs, and whose values are
         the Fs.
 
@@ -221,19 +206,23 @@ def field_to_dict(Xs: np.array, Fs: np.array) -> Dict[Tuple, np.array]:
 
 
 def mobility_functional(
-    path: np.array, od_mat: sp.csr.csr_matrix, grid_width: int, flags: np.array = None
+    path: np.ndarray,
+    od_mat: sp.csr_matrix,
+    grid_width: int,
+    flags: np.ndarray = None,
 ) -> float:
-    """Short summary.
+    """
+    Short summary.
 
     Parameters
     ----------
-    path : np.array
+    path : np.ndarray
         The (x, y) path for which the functional is computed.
     od_mat : csr_matrix
         The orgin-destination (OD) matrix to use as input.
     grid_width : int
         The width of the grid in the level.
-    flags : np.array, optional
+    flags : np.ndarray, optional
         The (x, y) coordinates of the flags (with the right order).
 
     Returns
@@ -242,6 +231,7 @@ def mobility_functional(
         The mobility functional.
 
     """
+    T = len(path)  # proxy for duration
     out = 0.0
     N = 0
 
@@ -249,7 +239,7 @@ def mobility_functional(
         assert flags is not None, "error: provide the coodinates of the flags"
         field = [field_to_dict(*calculate_field(mat, grid_width)) for mat in od_mat]
 
-        idx = breakup_array_by_flags(path, flags, R=3)
+        idx = breakup_by_flags(path, flags, R=3)
 
         for k, sub_arr in enumerate(np.split(path, idx[:-1])):
             for el in sub_arr:
@@ -265,4 +255,6 @@ def mobility_functional(
             out += np.dot(Fi, el)
             N += 1
 
-    return out / N
+    assert N == T
+
+    return out / T
