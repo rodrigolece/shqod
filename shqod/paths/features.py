@@ -1,13 +1,13 @@
 """Utility functions for path features."""
 
-from typing import Tuple
+from typing import Tuple, Dict
 
 import numpy as np
 import scipy.sparse as sp
 from sklearn.neighbors import KDTree
 
 from shqod.utils import sigmoid_ftn
-from shqod.matrices import breakup_by_flags, mobility_field, od_matrix
+from shqod.matrices import od_matrix  # breakup_by_flags
 from .transform import path2mat, boxcounts
 
 
@@ -163,9 +163,7 @@ def sum_match(
 
 def mobility_functional(
     path: np.ndarray,
-    normative_mat: sp.csr_matrix,
-    grid_width: int,
-    flags: np.ndarray = None,
+    field: Dict[Tuple[int, int], np.ndarray],
 ) -> float:
     """
     Short summary.
@@ -186,31 +184,28 @@ def mobility_functional(
     float
 
     """
-    # TODO: take the computation of the field out of this function and pass
-    # as argument because it can be re-used
-
     T = len(path)  # proxy for duration
     out = 0.0
 
     diff = path[1:] - path[:-1]
 
-    if isinstance(normative_mat, list):
-        assert flags is not None, "error: provide the coodinates of the flags"
-        field = [mobility_field(mat, grid_width) for mat in normative_mat]
+    #  if isinstance(normative_mat, list):
+    #      assert flags is not None, "error: provide the coodinates of the flags"
+    #      field = [mobility_field(mat, grid_width) for mat in normative_mat]
 
-        idx = breakup_by_flags(path, flags, R=3)
+    #      idx = breakup_by_flags(path, flags, R=3)
 
-        for k, sub_arr in enumerate(np.split(path, idx[:-1])):
-            for el in sub_arr:
-                Fi = field[k].get(tuple(el), np.zeros(2))
-                out += np.dot(Fi, el)
+    #      for k, sub_arr in enumerate(np.split(path, idx[:-1])):
+    #          for el in sub_arr:
+    #              Fi = field[k].get(tuple(el), np.zeros(2))
+    #              #  out += np.dot(Fi, el)
+    #              # TODO: this still has typo, should be diff not el
 
-    else:
-        field = mobility_field(normative_mat, grid_width)
+    #  else:
 
-        for k, el in enumerate(path[:-1]):
-            Fi = field.get(tuple(el), np.zeros(2))
-            out += np.dot(Fi, diff[k])
+    for k, el in enumerate(path[:-1]):
+        Fi = field.get(tuple(el), np.zeros(2))
+        out += np.dot(Fi, diff[k])
 
     return -out / T  # minus sign to reverse order
 

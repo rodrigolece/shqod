@@ -31,7 +31,7 @@ def od_matrix(
         Origin-destination (OD) matrix.
 
     """
-    width, length = grid_size
+    width, _ = grid_size
     size = np.multiply(*grid_size)
     out = sp.lil_matrix((size, size), dtype=int)
 
@@ -76,7 +76,7 @@ def od_matrix_brokenup(
         List of origin-destination (OD) matrices.
 
     """
-    width, length = grid_size
+    width, _ = grid_size
     size = np.multiply(*grid_size)
 
     nb_flags = len(flags)
@@ -134,7 +134,9 @@ def breakup_by_flags(path: np.ndarray, flags: np.ndarray, R: float = 3) -> List[
     return out
 
 
-def mobility_field(od_mat: sp.csr_matrix, grid_width: int) -> Dict[Tuple, np.ndarray]:
+def mobility_field(
+    od_mat: sp.csr_matrix, grid_width: int
+) -> Dict[Tuple[int, int], np.ndarray]:
     """
     Calculate the field at each location (origin) where it is non-zero.
 
@@ -157,7 +159,7 @@ def mobility_field(od_mat: sp.csr_matrix, grid_width: int) -> Dict[Tuple, np.nda
     i, j = od_mat.nonzero()
     r_origin = np.vstack((i % grid_width, i // grid_width)).T
     r_destination = np.vstack((j % grid_width, j // grid_width)).T
-    u_vec = r_destination - r_origin
+    u_vec = (r_destination - r_origin).astype(float)
 
     # normalize non-zero entries
     norm = np.linalg.norm(u_vec, axis=1)

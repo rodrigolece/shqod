@@ -74,9 +74,17 @@ class TestPathFeatures(unittest.TestCase):
         self.assertTrue(np.isclose(match, -0.2 / 2))  # two matching entries
 
     def test_mobility_functional(self):
-        wd = self.grid_size[0]
-        mob = mobility_functional(self.small_path, self.od_mat, wd)
-        self.assertTrue(np.isclose(mob, -0.2 / 3))  # length 3
+        diag = np.ones(2)
+        diag *= 0.1 / np.linalg.norm(diag)
+        right_up = np.array([0.8, 0.1])
+        field = {
+            (0, 0): right_up + diag,
+            (0, 1): np.array([0.1, 0.0]),
+            (1, 0): np.array([0.0, 0.8]),
+        }
+        mob = mobility_functional(self.small_path, field)
+        dots = np.dot(field[(0, 0)], [0, 1]) + np.dot(field[(0, 1)], [1, 0])
+        self.assertTrue(np.isclose(mob, -dots / 3))  # length 3
 
 
 if __name__ == "__main__":
