@@ -9,7 +9,7 @@ from shqod.io import (
     read_level_flags,
 )
 
-from shqod.proc import TrajProcessor, NormativeProcessor
+from shqod.proc import AbsProcessor, RelProcessor
 
 from shqod.matrices import (
     od_matrix,

@@ -13,7 +13,7 @@ from esig import tosig as pathsig
 
 from typing import Tuple, List
 from shqod.io import LevelsLoader, read_level_grid, read_level_flags
-from shqod.matrices import od_matrix
+from shqod.matrices import od_matrix, mobility_field
 from shqod.paths import (
     path_length,
     avg_curvature,
@@ -25,9 +25,10 @@ from shqod.paths import (
     visiting_order,
     smooth,
 )
+from shqod.utils import _get_iterable
 
 
-class TrajProcessor(object):
+class AbsProcessor(object):
     def __init__(self, level: int, gender: str, **kwargs):
 
         self.level = level
@@ -88,6 +89,8 @@ class TrajProcessor(object):
         return pathsig.stream2logsig(path, self.max_sigdim)
 
     def get_smooth_features(self, df, feat_types, keys=["id"]):
+        #  feat_types = _get_iterable(feat_types)
+        # TODO: not working because of copy below
         # TODO: some sort of check for the feat_type's
         out = df.reset_index(drop=True)
         N = len(out)
@@ -138,7 +141,7 @@ class TrajProcessor(object):
         return visiting_order(path, flag_coords, **params)
 
 
-class NormativeProcessor(TrajProcessor):
+class RelProcessor(AbsProcessor):
     def __init__(self, loader: LevelsLoader, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.loader = loader
@@ -154,8 +157,7 @@ class NormativeProcessor(TrajProcessor):
             loader.get(*key)  # pre-load the df
 
         self._normative_mat = None
-        # Used to store a particular instance of normative od matrix
-        # as a tuple (mat, N) where N is the number of paths used
+        self._normative_field = None
 
     def __str__(self):
         return f"Normative processor: {self.country} - {self.gender} - {self.level}"
@@ -164,27 +166,31 @@ class NormativeProcessor(TrajProcessor):
     def normative_mat(self):
         return self._normative_mat
 
+    @property
+    def normative_field(self):
+        return self._normative_field
+
     @normative_mat.setter
     def normative_mat(self, mat):
         assert sp.isspmatrix_csr(mat), "error: invalid format for matrix"
-        wd, lg = self.grid_width, self.grid_length
-        N = wd * lg
-        assert mat.shape == (N, N), "error: invalid dimensions for matrix"
+        size = np.multiply(*self.grid_size)
+        assert mat.shape == (size, size), "error: invalid dimensions for matrix"
         self._normative_mat = mat
+        self._normative_field = mobility_field(mat, self.grid_width)
 
     def _get_df_for_age(self, age: int):
         df = self.loader.get(self.level, self.gender, age)
         return df
 
     @lru_cache
-    def normative_od_matrix_for_age(self, age: int):
+    def _normative_od_matrix_for_age(self, age: int):
         df = self._get_df_for_age(age)
         N = len(df)
 
         return od_matrix(df.trajectory_data, self.grid_size), N
 
     @lru_cache
-    def normative_od_matrix_window(self, centre):
+    def normative_od_matrix_windowed(self, centre):
         window = self.window_size
         scale = self.weight_scale
 
@@ -196,12 +202,11 @@ class NormativeProcessor(TrajProcessor):
             weights = st.distributions.norm(centre, scale=scale).pdf(ages)
             weights /= weights.sum()
 
-        wd, lg = self.grid_width, self.grid_length
-        N = wd * lg
-        out = sp.csr_matrix((N, N))
+        size = np.multiply(*self.grid_size)
+        out = sp.csr_matrix((size, size))
 
         for i, age in enumerate(ages):
-            mat, N = self.normative_od_matrix_for_age(age)
+            mat, N = self._normative_od_matrix_for_age(age)
             out += weights[i] * mat / N
 
         return out
@@ -216,9 +221,11 @@ class NormativeProcessor(TrajProcessor):
         return sum_match(path, self.grid_size, self.normative_mat)
 
     def get_mob(self, path):
-        return mobility_functional(path, self.normative_mat, self.grid_width)
+        return mobility_functional(path, self.normative_field)
 
     def get_coarse_features(self, df, feat_types, keys=["id"]):
+        #  feat_types = _get_iterable(feat_types)
+        # TODO: not working because of copy below
         # TODO: some sort of check for the feat_types
         if self.normative_mat is None:
             raise Exception("normative OD matrix has not been set")
@@ -263,8 +270,8 @@ class NormativeProcessor(TrajProcessor):
         out = []
 
         for age, age_df in gby:
-            wmat = self.normative_od_matrix_window(age)
-            self._normative_mat = wmat  # we skip tests
+            wmat = self.normative_od_matrix_windowed(age)
+            self.normative_mat = wmat  # this also sets normative_field
             out.append(self.get_coarse_features(age_df, feat_types, keys=keys))
 
         if sort_id:
@@ -331,7 +338,8 @@ def compute_percentiles(
             ref = loader.get(lvl, g, row.age, filter_vo=filter_vo, verbose=False)
             # for each age
 
-            for k, col in enumerate(feat_types):
+            #  for k, col in enumerate(feat_types):
+            for col in feat_types:
                 scores, val = ref[col], row[col]
                 if col in reverse_cols:  # reverse the scores
                     scores = -scores
