@@ -3,16 +3,15 @@ from pathlib import Path
 import itertools
 from multiprocessing import Pool
 
-import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import pyarrow.feather as feather
 
 from shqod import (
     read_path_feather,
-    UntidyLoader,
-    TrajProcessor,
-    NormativeProcessor,
+    LevelsLoader,
+    AbsProcessor,
+    RelProcessor,
 )
 
 
@@ -20,13 +19,13 @@ data_dir = Path(os.environ["dementia"]) / "data"
 grid_dir = data_dir / "maps"  # the maps
 
 paths_dir = data_dir / "normative" / "paths"
-paths_loader = UntidyLoader(paths_dir, fmt="feather")
+paths_loader = LevelsLoader(paths_dir, fmt="feather")
 norm_loader = paths_loader  # used inside the normative processor
 # just a different name because it serves different purpose, but actually just
 # the normative paths
 
 clinical_paths = data_dir / "clinical" / "paths.feather"
-clinical_features = data_dir / "clinical" / "features.feather"  # save name
+output_name = data_dir / "clinical" / "features.feather"  # clinical_features
 clinical_paths_df = read_path_feather(clinical_paths, path_col="trajectory_data")
 
 
@@ -65,11 +64,11 @@ def process_level_gender(key):
     lvl_hp = hp.copy()
     lvl_hp.update(inner_bdy_radii[lvl])
 
-    proc = TrajProcessor(lvl, g, **lvl_hp)
+    proc = AbsProcessor(lvl, g, **lvl_hp)
     feat_df = proc.get_smooth_features(df, abs_cols, keys=idx_cols)
     feat_df = feat_df.rename(columns={"duration": "dur"}).set_index(idx_cols)
 
-    norm_proc = NormativeProcessor(norm_loader, lvl, g, **lvl_hp)
+    norm_proc = RelProcessor(norm_loader, lvl, g, **lvl_hp)
     nfeat_df = norm_proc.get_windowed_features(df, rel_cols, keys=idx_cols)
     nfeat_df = nfeat_df.set_index(idx_cols)
 
@@ -90,4 +89,4 @@ if __name__ == "__main__":
         )
 
     # Write file
-    feather.write_feather(features_df, clinical_features)
+    feather.write_feather(features_df, output_name)

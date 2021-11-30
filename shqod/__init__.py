@@ -18,4 +18,16 @@ from shqod.matrices import (
     #  breakup_by_flags,
 )
 
-#  from shqod.paths import fractal_dim, path_length, mobility_functional,
+from shqod.paths import (
+    smooth,
+    visiting_order,
+    vo_correctness,
+    path_length,
+    avg_curvature,
+    bdy_affinity,
+    #  fractal_dim,
+    frobenius_deviation,
+    supremum_deviation,
+    sum_match,
+    mobility_functional,
+)

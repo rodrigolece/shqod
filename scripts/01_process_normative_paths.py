@@ -3,21 +3,19 @@ from pathlib import Path
 import itertools
 from multiprocessing import Pool
 
-import numpy as np
 from tqdm import tqdm
 import pyarrow.feather as feather
 
-from shqod import UntidyLoader, TrajProcessor, NormativeProcessor
+from shqod import LevelsLoader, AbsProcessor, RelProcessor
 
 
 data_dir = Path(os.environ["dementia"]) / "data"
 grid_dir = data_dir / "maps"  # the maps
 
 paths_dir = data_dir / "normative" / "paths"
-features_dir = data_dir / "normative" / "features"  # save_directory
-# NB: not overwriting because I moved the old features to features_old/ dir
+output_dir = data_dir / "normative" / "features"  # features_dir
 
-paths_loader = UntidyLoader(paths_dir, fmt="feather")
+paths_loader = LevelsLoader(paths_dir, fmt="feather")
 norm_loader = paths_loader  # used inside the normative processor
 # just a different name because it serves different purpose, but actually just
 # the normative paths
@@ -54,17 +52,17 @@ def process_level_gender(key):
     lvl_hp = hp.copy()
     lvl_hp.update(inner_bdy_radii[lvl])
 
-    proc = TrajProcessor(lvl, g, **lvl_hp)
+    proc = AbsProcessor(lvl, g, **lvl_hp)
     feat_df = proc.get_smooth_features(df, keys).rename(columns={"duration": "dur"})
 
-    norm_proc = NormativeProcessor(norm_loader, lvl, g, **lvl_hp)
+    norm_proc = RelProcessor(norm_loader, lvl, g, **lvl_hp)
     nfeat_df = norm_proc.get_windowed_features(df, nkeys)
 
     # Combine the absolute and relative features
     feat_df = feat_df.join(nfeat_df[nkeys])
 
     # Write file
-    filename = features_dir / f"level_{lvl}_uk_{g}.feather"
+    filename = output_dir / f"level_{lvl}_uk_{g}.feather"
     feather.write_feather(feat_df, filename)
 
     # This should free up memory, though in paralell it might not help much
@@ -72,6 +70,10 @@ def process_level_gender(key):
 
 
 if __name__ == "__main__":
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
     with Pool() as p:
         iterable = itertools.product(levels, genders)
         list(tqdm(p.imap(process_level_gender, iterable), total=nb_iters))
