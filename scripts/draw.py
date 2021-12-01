@@ -57,14 +57,14 @@ target_orders = {
 
 def plot_quartiles(ax, df, col, label=None):
     data = df.groupby("age")[col].describe()
-    ax.plot(data["50%"], "-", label=label)
+    ln = ax.plot(data["50%"], "-", label=label)
     # TODO: this is where I need to fix the legend so that it includes shaded areas
-    ax.fill_between(data.index, data["25%"], data["75%"], alpha=0.1)
+    poly = ax.fill_between(data.index, data["25%"], data["75%"], alpha=0.1)
 
     ax.set_xlabel("Age")
     ax.set_ylabel(title[col])
 
-    return None
+    return ln[0], poly
 
 
 def plot_quartiles_by_vo(
@@ -84,11 +84,13 @@ def plot_quartiles_by_vo(
     df, vo_idx = data["df"], data["idx"]
     correct, incorrect = df.loc[vo_idx], df.loc[~vo_idx]
 
-    plot_quartiles(ax, correct, col, label="Correct VO")
-    plot_quartiles(ax, incorrect, col, label="Incorrect VO")
+    art1 = plot_quartiles(ax, correct, col)
+    art2 = plot_quartiles(ax, incorrect, col)
 
     if legend:
-        ax.legend(loc=loc)
+        handles = [art1, art2]
+        labels = ["VO-C", "VO-I"]
+        ax.legend(handles, labels, loc=loc)
 
 
 def plot_roc_curves(
@@ -100,7 +102,6 @@ def plot_roc_curves(
     loc="lower right",
     verbose=False,
 ):
-
     if verbose:
         print("\nLoading: ", filename)
 
