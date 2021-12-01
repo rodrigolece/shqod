@@ -3,3 +3,5 @@
 shqod.egg-info
 
 scripts/deprecated/
+scripts/data_intermediate/
+scripts/figures/
