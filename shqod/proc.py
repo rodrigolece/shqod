@@ -324,9 +324,6 @@ def compute_percentiles(
 
     # TODO: do I need to call copy()?
 
-    # the features for which a high value is bad need to be reversed
-    reverse_cols = ["dur", "len", "curv", "bdy", "fro", "sup"]
-
     levels = df.level.unique()
     genders = df.gender.unique()
 
@@ -338,13 +335,8 @@ def compute_percentiles(
             ref = loader.get(lvl, g, row.age, filter_vo=filter_vo, verbose=False)
             # for each age
 
-            #  for k, col in enumerate(feat_types):
             for col in feat_types:
                 scores, val = ref[col], row[col]
-                if col in reverse_cols:  # reverse the scores
-                    scores = -scores
-                    val = -val
-
                 out.loc[i, col] = st.percentileofscore(scores, val, kind="weak")
                 # weak corresponds to the CDF definition
 
