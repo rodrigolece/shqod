@@ -8,6 +8,7 @@ from sklearn import metrics
 #  import pyarrow.feather as feather
 
 from shqod import LevelsLoader, vo_correctness
+from draw import cols, levels_shq
 
 
 data_dir = Path(os.environ["dementia"]) / "data"
@@ -32,14 +33,6 @@ features_loader = LevelsLoader(features_dir, fmt="feather")
 #  clinical_features_df = feather.read_feather(clinical_features)
 
 
-keys = ["dur", "len", "curv", "bdy", "fro", "sup", "match", "mob"]
-levels = [6, 8, 11]
-
-# Used for the ROC curves
-#  signs = dict(zip(keys, [-1] * 6 + [1] * 2))
-signs = dict(zip(keys, [-1] * 8))
-
-
 def load_mixed_genders(level, age="50:"):
     f = features_loader.get(level, "f", age=age)
     m = features_loader.get(level, "m", age=age)
@@ -49,14 +42,14 @@ def load_mixed_genders(level, age="50:"):
     return df, idx
 
 
-def prepare_roc_auc_data(df, idx, sign_dict=signs):
+def prepare_roc_auc_data(df, idx, feat_types=cols):
     roc_xy_dict = {}
     auc_dict = {}
 
     label = idx.astype(int)
 
-    for feat, s in sign_dict.items():
-        score = df[feat] * s
+    for feat in feat_types:
+        score = -df[feat]  # roc definition has incorrect group (voc-0) first hence -1
 
         fpr, tpr, _ = metrics.roc_curve(label, score)  # 3rd argument is thresholds
         roc_xy_dict[feat] = (fpr, tpr)
@@ -66,6 +59,7 @@ def prepare_roc_auc_data(df, idx, sign_dict=signs):
 
 
 if __name__ == "__main__":
+
     save = False
 
     # Level 6 for the feature separation depending on VO
@@ -87,9 +81,9 @@ if __name__ == "__main__":
     # We use level 6 wich was previously loaded
     roc_xy[lvl], auc[lvl] = prepare_roc_auc_data(df, idx)
     correls[lvl] = df.corr()
-    levels.remove(lvl)
+    levels_shq.remove(lvl)
 
-    for lvl in levels:
+    for lvl in levels_shq:
         df, idx = load_mixed_genders(level=lvl)
         roc_xy[lvl], auc[lvl] = prepare_roc_auc_data(df, idx)
         correls[lvl] = df.corr()

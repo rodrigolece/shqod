@@ -33,7 +33,7 @@ plt.rc("figure", titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 plt.rc("font", **{"family": "sans-serif", "sans-serif": ["Arial"]})
 
-# The defuault cycler
+# The default cycler
 orig_cycler = plt.rcParams.get("axes.prop_cycle")
 
 
@@ -141,7 +141,7 @@ def main():
             panel_label_axes.append(ax)
 
     # Background, labels, and annotations
-    bg = pu.Background(visible=False)
+    pu.Background(visible=False)
     pu.add_panel_labels(
         fig, axes=panel_label_axes, fontsize=18, xs=[-0.3, -0.2, -0.3]
     )  # ys
@@ -150,12 +150,14 @@ def main():
 
 
 if __name__ == "__main__":
+
     save = True
+
     fig = main()
 
     if save:
         filename = figures_dir / "figure_vo.pdf"  # svg
-        fig.savefig(filename, bbox_iches="tight")
+        fig.savefig(filename)  # bbox_inches="tight" mess the alignment
         print("Saved to: ", filename)
 
     print("\nDone!\n")

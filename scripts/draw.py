@@ -4,6 +4,7 @@ import pickle
 
 import matplotlib.pyplot as plt
 from cycler import cycler
+import seaborn as sns
 
 # The color cycler used for the ROC curves
 set3_colors = list(plt.get_cmap("Set3").colors)
@@ -13,21 +14,21 @@ set3_cycler = cycler(color=set3_colors)
 cols = ["dur", "len", "curv", "bdy", "fro", "sup", "match", "mob"]
 
 # titles
-short = ["Dur.", "Len.", "Curv.", "Bdry.", "Frob", "Sup.", "Match.", "Mob."]
+short = ["Dur.", "Len.", "Curv.", "Bdry.", "Frob.", "Sup.", "Match.", "Mob."]
 med = [
     "Dur.",
     "Len.",
     "Curv.",
     "Bdry. affty.",
-    "Frob. dev.",
-    "Sup. dev.",
-    "Match. sum",
+    "Frob.",
+    "Sup.",
+    "Match.",
     "Mob. funct.",
 ]
 long = [
     "Duration",
     "Length",
-    "Total curvature",
+    "Avg. curvature",
     "Boundary affinity",
     "Frobenius dev.",
     "Supremum dev.",
@@ -43,10 +44,7 @@ features = title.keys()
 feat_types = cols
 
 genders = ["f", "m"]
-
-# reverse_cols = ['len', 'curv', 'dtb', 'fro', 'inf']
-# NB: more practical to reverse the remaining 2
-reverse_cols = ["sum_match", "mob"]
+levels_shq = [6, 8, 11]
 
 target_orders = {
     6: [0, 1, 2],
@@ -161,3 +159,47 @@ def plot_abs_correl(
         plt.colorbar(mappable, cax=cax, **cbar_args)
 
     return mat
+
+
+def boxplot(
+    ax,
+    filename,
+    level,
+    groups=["e3e3", "e3e4", "ad"],
+    legend=True,
+    loc="upper right",
+    verbose=False,
+):
+    if verbose:
+        print("\nLoading: ", filename)
+
+    with open(filename, "rb") as f:
+        data = pickle.load(f)
+
+    data_df = data[level]
+    data_df = data_df.loc[data_df.group.isin(groups)].replace(title_short)
+
+    sns.boxplot(
+        data=data_df,
+        x="type",
+        y="feat",
+        hue="group",
+        hue_order=groups,
+        showcaps=False,
+        showfliers=True,
+        ax=ax,
+    )
+
+    Y = 105
+
+    if legend:
+        ax.legend(*ax.get_legend_handles_labels(), loc=loc, ncol=len(groups))
+        Y += 20
+    else:
+        ax.legend([], [], frameon=False)
+
+    ax.set_ylim((-5, Y))
+
+    ax.set_xlabel("")
+    ax.set_ylabel("Percentile")
+    ax.set_title(f"Level {level}")
