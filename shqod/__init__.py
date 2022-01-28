@@ -9,7 +9,12 @@ from shqod.io import (
     read_level_flags,
 )
 
-from shqod.proc import AbsProcessor, RelProcessor, compute_percentiles
+from shqod.proc import (
+    AbsProcessor,
+    RelProcessor,
+    compute_percentiles,
+    fill_missing_attempts,
+)
 
 from shqod.matrices import (
     od_matrix,

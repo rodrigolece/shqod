@@ -79,7 +79,10 @@ def vo_correctness(vo_series, lvl, verbose=True):
 
     target_order = orders[lvl]
 
-    out = vo_series.apply(lambda el: el.tolist() == target_order)
+    # To be able to deal wiht NaNs we will with empty array
+    out = vo_series.apply(
+        lambda x: x if isinstance(x, np.ndarray) else np.array([])
+    ).apply(lambda el: el.tolist() == target_order)
 
     if verbose:
         fraction = out.sum() / len(vo_series)

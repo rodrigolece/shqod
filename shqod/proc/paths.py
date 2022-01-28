@@ -2,7 +2,6 @@
 
 import os
 from pathlib import Path
-import itertools
 from functools import lru_cache
 
 import numpy as np
@@ -11,7 +10,6 @@ import scipy.stats as st
 import pandas as pd
 from esig import tosig as pathsig
 
-from typing import Tuple, List
 from shqod.io import LevelsLoader, read_level_grid, read_level_flags
 from shqod.matrices import od_matrix, mobility_field
 from shqod.paths import (
@@ -25,7 +23,6 @@ from shqod.paths import (
     visiting_order,
     smooth,
 )
-from shqod.utils import _get_iterable
 
 
 class AbsProcessor(object):
@@ -280,64 +277,3 @@ class RelProcessor(AbsProcessor):
             out = pd.concat(out, ignore_index=True)
 
         return out
-
-
-def compute_percentiles(
-    df: pd.DataFrame,
-    loader: LevelsLoader,
-    feat_types: List[str],
-    filter_vo: bool = False,
-    drop_sig: bool = True,
-) -> pd.DataFrame:
-    """
-    Compute the percentile score for a set of features and a reference pop.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        The input data; it should contain the calculated features.
-    loader : LevelsLoader
-       The loader that get the DataFrames for the normative population; these
-       should also contain calculated features.
-    feat_types : List[str]
-        The names of the features columns to use.
-    filter_vo : bool
-        When set to True, we take as a reference the subset of the normative
-        population that has the correct visiting order.
-    drop_sig: bool, optional
-        Whether to ignore path signature features (default is True). This
-        option overrides any names that could be contained inside the list
-        `feat_types`.
-
-    Returns
-    -------
-    pd.DataFrame
-        The output mimics the shape of the input `df` with the original entries
-        replaced by numbers in [0, 100] that represent the percentiles.
-
-    """
-    if drop_sig:  # do not compute percentiles for path signature
-        drop_cols = filter(lambda c: c.startswith("sig"), df.columns)
-        out = df.drop(columns=drop_cols)
-    else:
-        out = df
-
-    # TODO: do I need to call copy()?
-
-    levels = df.level.unique()
-    genders = df.gender.unique()
-
-    # percentile computation for each level and gender
-    for lvl, g in itertools.product(levels, genders):
-        idx = (out.level == lvl) & (out.gender == g)
-
-        for i, row in out.loc[idx].iterrows():
-            ref = loader.get(lvl, g, row.age, filter_vo=filter_vo, verbose=False)
-            # for each age
-
-            for col in feat_types:
-                scores, val = ref[col], row[col]
-                out.loc[i, col] = st.percentileofscore(scores, val, kind="weak")
-                # weak corresponds to the CDF definition
-
-    return out
