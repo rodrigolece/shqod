@@ -1,9 +1,9 @@
 """Utility functions for path transformations."""
 
 import numpy as np
-from scipy.ndimage import gaussian_filter
+from scipy.ndimage import gaussian_filter1d
 
-from shqod.utils import linear_extend, gaussian_2d_filter
+from shqod.utils import linear_extend
 
 
 def path2mat(path: np.ndarray, width: int, length: int) -> np.ndarray:
@@ -63,16 +63,13 @@ def boxcounts(Z: np.ndarray, box_size: int) -> int:
 
 def smooth(
     path: np.ndarray,
-    spline_res: float = 3,
+    spline_res: int = 3,
     bandwidth: float = 1.67,
 ) -> np.ndarray:
     """Return smooth path."""
+    if path.shape[1] != 2:
+        raise ValueError("path has the wrong shape")
 
-    assert path.shape[1] == 2, "path has the wrong shape"
+    X = linear_extend(path, spline_res)
 
-    X = linear_extend(path[:, 0], spline_res)
-    Y = linear_extend(path[:, 1], spline_res)
-    gX = gaussian_filter(X, spline_res * bandwidth)
-    gY = gaussian_filter(Y, spline_res * bandwidth)
-
-    return np.vstack((gX, gY)).T
+    return gaussian_filter1d(X, spline_res * bandwidth, axis=0)
