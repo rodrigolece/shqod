@@ -12,6 +12,7 @@ from shqod import (
     LevelsLoader,
     AbsProcessor,
     RelProcessor,
+    fill_missing_attempts,
 )
 
 
@@ -32,6 +33,7 @@ clinical_paths_df = read_path_feather(clinical_paths, path_col="trajectory_data"
 abs_cols = ["len", "curv", "bdy"]
 rel_cols = ["fro", "sup", "match", "mob", "vo"]
 idx_cols = ["id", "group"]
+all_cols = ["dur"] + abs_cols + rel_cols
 
 
 hp = {
@@ -82,11 +84,18 @@ def process_level_gender(key):
 
 
 if __name__ == "__main__":
+
+    save = True
+
     with Pool() as p:
         iterable = itertools.product(levels, genders)
         features_df = pd.concat(
             tqdm(p.imap(process_level_gender, iterable), total=nb_iters)
         )
 
+    # Post-process the missing AD patients and fill with NA
+    features_df = fill_missing_attempts(features_df, all_cols, missing_group="ad")
+
     # Write file
-    feather.write_feather(features_df, output_name)
+    if save:
+        feather.write_feather(features_df, output_name)

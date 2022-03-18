@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 import pickle
 
+import numpy as np
 import pandas as pd
 from sklearn import metrics
 import pyarrow.feather as feather
@@ -33,7 +34,11 @@ clinical_features_df = clinical_features_df.loc[idx].drop(columns=drop_cols)
 # Compute percentiles of the clinical features
 
 clinical_percentiles_df = compute_percentiles(
-    clinical_features_df, features_loader, cols, filter_vo=True
+    clinical_features_df,
+    features_loader,
+    cols,
+    filter_vo=True,
+    fillna=np.inf,
 )
 
 
@@ -56,7 +61,7 @@ def make_data_long(df, level, feat_types=cols, idx_on=["id", "group"]):
 
 if __name__ == "__main__":
 
-    save = True
+    save = False
 
     long_dict = {}
 

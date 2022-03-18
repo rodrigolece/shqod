@@ -5,3 +5,9 @@ shqod.egg-info
 scripts/deprecated/
 scripts/data_intermediate/
 scripts/figures/
+
+scripts_paper/data_intermediate
+scripts_paper/deprecated
+scripts_paper/figures
+scripts_thesis/data_intermediate
+scripts_thesis/figures

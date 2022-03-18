@@ -151,12 +151,12 @@ def main():
 
 if __name__ == "__main__":
 
-    save = True
+    save = False
 
     fig = main()
 
     if save:
-        filename = figures_dir / "figure_vo.pdf"  # svg
+        filename = figures_dir / "panel_vo.pdf"  # svg
         fig.savefig(filename)  # bbox_inches="tight" mess the alignment
         print("Saved to: ", filename)
 

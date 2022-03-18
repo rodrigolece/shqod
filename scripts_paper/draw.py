@@ -2,9 +2,12 @@
 
 import pickle
 
+import numpy as np
 import matplotlib.pyplot as plt
 from cycler import cycler
 import seaborn as sns
+
+import shqod
 
 # The color cycler used for the ROC curves
 set3_colors = list(plt.get_cmap("Set3").colors)
@@ -203,3 +206,39 @@ def boxplot(
     ax.set_xlabel("")
     ax.set_ylabel("Percentile")
     ax.set_title(f"Level {level}")
+
+
+def path(ax, path, ms=40):
+    start = path[0]
+    spath = shqod.smooth(path)
+
+    ax.scatter(path[:, 0], path[:, 1], s=10, c="0.6", zorder=1)
+    ax.plot(spath[:, 0], spath[:, 1], "0.2", zorder=2)
+    ax.scatter(*start, s=ms, c="C1", marker="^", zorder=3)
+
+
+def geometry(ax, grid_dir, lvl, ms=50, fs=10, simple=True):
+    map_filename = grid_dir / f"level{lvl:02}.json"
+    flags = shqod.read_level_flags(map_filename)[::-1]
+
+    if simple:
+        inner_filename = grid_dir / f"inner_bdy_level{lvl:02}.npy"
+        bdy = np.load(inner_filename)
+
+        # We do a little shift and extension to hide the discontinuity in the
+        # smooth interpolation of the map
+        shift, ext = -5, 3
+
+        bdy = np.roll(bdy, shift, axis=0)
+        bdy = np.append(bdy, bdy[:ext], axis=0)
+        sbdy = shqod.smooth(bdy)
+
+        ax.plot(sbdy[:, 0], sbdy[:, 1], "gainsboro", zorder=0)
+
+    else:
+        land, _, _ = shqod.read_level_grid(map_filename)
+        ax.scatter(land[:, 0], land[:, 1], c="gainsboro")
+
+    ax.scatter(flags[:, 0], flags[:, 1], s=ms, c="C1", marker="s", zorder=4)
+    for i, (x, y) in enumerate(flags):
+        ax.text(x, y - 0.5, str(i + 1), ha="center", va="center", fontsize=fs, zorder=5)

@@ -38,7 +38,7 @@ color_map = dict(zip(["e3e3", "e3e4", "e4e4", "ad"], orig_cycler.by_key()["color
 load_dir = Path("data_intermediate")
 figures_dir = Path("figures")
 
-boxplot_filename = load_dir / "clinical-long-percentiles_three-levels.pkl"
+boxplot_filename = load_dir / "clinical-long-percentiles_three-levels_novo.pkl"
 assert os.path.isfile(boxplot_filename)
 
 
@@ -46,7 +46,8 @@ def main(groups):
     fig = plt.figure(figsize=(7.0, 8.0))
 
     gs = fig.add_gridspec(
-        nrows=3,
+        3,
+        1,
         left=0.1,
         right=0.98,
         bottom=0.04,
@@ -67,7 +68,7 @@ def main(groups):
 
 if __name__ == "__main__":
 
-    save = True
+    save = False
 
     groups = ["e3e3", "e3e4", "ad"]
     custom_cycler = cycler(color=[color_map[g] for g in groups])
@@ -76,7 +77,7 @@ if __name__ == "__main__":
     fig = main(groups)
 
     if save:
-        filename = figures_dir / "figure_boxplot.pdf"  # svg
+        filename = figures_dir / "panel_boxplot_novo.pdf"  # svg
         fig.savefig(filename)  # bbox_inches="tight" mess the alignment
         print("Saved to: ", filename)
 
