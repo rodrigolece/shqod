@@ -69,6 +69,8 @@ def vo_correctness(vo_series, lvl, verbose=True):
 
     # TODO: fill in other levels.
     orders = {
+        1: [0],
+        2: [0],
         6: [0, 1, 2],
         8: [0, 1, 2],
         11: [1, 0, 1, 2],

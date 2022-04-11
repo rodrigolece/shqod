@@ -21,23 +21,32 @@ features_loader = LevelsLoader(features_dir, fmt="feather")
 
 
 # Clinical
-clinical_features = data_dir / "clinical" / "features.feather"
-clinical_features_df = feather.read_feather(clinical_features)
+clinical_dir = data_dir / "clinical"
+clinical_features_df = feather.read_feather(clinical_dir / "features.feather")
+normed_features_df = feather.read_feather(clinical_dir / "normed_features.feather")
 
 idx = clinical_features_df.level.isin(levels_shq)
 demo_cols = ["id", "group", "age", "gender", "level"]
 drop_cols = set(clinical_features_df.columns).difference(cols + demo_cols)
 
 clinical_features_df = clinical_features_df.loc[idx].drop(columns=drop_cols)
+normed_features_df = normed_features_df.drop(columns=drop_cols)
 
-
-# Compute percentiles of the clinical features
 
 clinical_percentiles_df = compute_percentiles(
     clinical_features_df,
     features_loader,
     cols,
     filter_vo=True,
+    fillna=np.inf,
+)
+
+normed_percentiles_df = compute_percentiles(
+    normed_features_df,
+    features_loader,
+    cols,
+    filter_vo=True,
+    norm=True,
     fillna=np.inf,
 )
 
@@ -61,18 +70,25 @@ def make_data_long(df, level, feat_types=cols, idx_on=["id", "group"]):
 
 if __name__ == "__main__":
 
-    save = False
+    save = True
 
     long_dict = {}
+    norm_long_dict = {}
 
     for lvl in levels_shq:
         long_dict[lvl] = make_data_long(clinical_percentiles_df, lvl)
+        norm_long_dict[lvl] = make_data_long(normed_percentiles_df, lvl)
 
-    filename = save_dir / "clinical-long-percentiles_three-levels.pkl"
+    save_name = save_dir / "clinical-long-percentiles_three-levels.pkl"
+    normed_sname = save_dir / "normed-clinical-long-percentiles_three-levels.pkl"
 
     if save:
-        with open(filename, "wb") as f:
+        with open(save_name, "wb") as f:
             pickle.dump(long_dict, f)
-            print("\nSaved long data to: ", filename)
+            print("\nSaved long data to: ", save_name)
+
+        with open(normed_sname, "wb") as f:
+            pickle.dump(norm_long_dict, f)
+            print("\nSaved long data to: ", normed_sname)
 
     print("\nDone!\n")

@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import pickle
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -41,20 +42,21 @@ orig_cycler = plt.rcParams.get("axes.prop_cycle")
 load_dir = Path("data_intermediate")
 figures_dir = Path("figures")
 
-# Level 6 for the feature separation depending on VO
-lvl = 6
-vo_filename = load_dir / f"dataframe_level{lvl:02}.pkl"
-assert os.path.isfile(vo_filename)
 
-roc_filename = load_dir / "roc-auc_three-levels.pkl"
-assert os.path.isfile(roc_filename)
+def main(preffix):
+    vo_filename = load_dir / f"{preffix}dataframe_level06.pkl"
+    assert vo_filename.is_file()
 
-# The correlations
-corr_filename = load_dir / "correls_three-levels.pkl"
-assert os.path.isfile(corr_filename)
+    roc_filename = load_dir / f"{preffix}roc-auc_three-levels.pkl"
+    assert roc_filename.is_file()
 
+    with open(roc_filename, "rb") as f:
+        roc_xy = pickle.load(f)["roc_xy"]
 
-def main():
+    # The correlations
+    corr_filename = load_dir / f"{preffix}correls_three-levels.pkl"
+    assert corr_filename.is_file()
+
     fig = plt.figure(figsize=(7.0, 10.0))  # contrained_layout=True
 
     gs_a = fig.add_gridspec(
@@ -104,7 +106,7 @@ def main():
         ax = fig.add_subplot(subplot_spec, aspect="equal")
 
         leg = i == 0
-        plot_roc_curves(ax, roc_filename, cols[i], legend=leg)
+        plot_roc_curves(ax, roc_xy, cols[i], legend=leg)
 
         if i // 4 == 0:  # top row
             plt.setp(ax.get_xticklabels(), visible=False)
@@ -150,13 +152,21 @@ def main():
 
 
 if __name__ == "__main__":
+    import argparse
 
-    save = False
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--norm", action="store_true")
+    args = parser.parse_args()
 
-    fig = main()
+    norm = args.norm
+    preffix = "normed_" if norm else ""
+
+    save = True
+
+    fig = main(preffix)
 
     if save:
-        filename = figures_dir / "panel_vo.pdf"  # svg
+        filename = figures_dir / f"{preffix}panel_vo.pdf"  # svg
         fig.savefig(filename)  # bbox_inches="tight" mess the alignment
         print("Saved to: ", filename)
 

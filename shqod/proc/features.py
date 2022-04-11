@@ -16,8 +16,8 @@ def compute_percentiles(
     loader: LevelsLoader,
     feat_types: List[str],
     filter_vo: bool = False,
+    norm: bool = False,
     fillna: float = np.inf,
-    drop_sig: bool = True,
 ) -> pd.DataFrame:
     """
     Compute the percentile score for a set of features and a reference pop.
@@ -30,17 +30,13 @@ def compute_percentiles(
        The loader that get the DataFrames for the normative population; these
        should also contain calculated features.
     feat_types : List[str]
-        The names of the features columns to use.
+        The names of the feature columns to use.
     filter_vo : bool, optional
         When set to True, we take as a reference the subset of the normative
         population that has the correct visiting order.
     fillna : np.float, optional
         Replace missing values with a given value (usually np.inf). None can
         also be used to disable the fill behaviour.
-    drop_sig: bool, optional
-        Whether to ignore path signature features (default is True). This
-        option overrides any names that could be contained inside the list
-        `feat_types`.
 
     Returns
     -------
@@ -49,11 +45,7 @@ def compute_percentiles(
         replaced by numbers in [0, 100] that represent the percentiles.
 
     """
-    if drop_sig:  # do not compute percentiles for path signature
-        drop_cols = filter(lambda c: c.startswith("sig"), df.columns)
-        out = df.drop(columns=drop_cols)
-    else:
-        out = df.copy()
+    out = df.copy()
 
     levels = df.level.unique()
     genders = df.gender.unique()
@@ -66,8 +58,15 @@ def compute_percentiles(
         idx = (out.level == lvl) & (out.gender == g)
 
         for i, row in out.loc[idx].iterrows():
-            ref = loader.get(lvl, g, row.age, filter_vo=filter_vo, verbose=False)
-            # for each age
+            ref = loader.get(
+                lvl,
+                g,
+                row.age,
+                filter_vo=filter_vo,
+                norm=norm,
+                feat_types=feat_types,
+                verbose=False,
+            )
 
             for col in feat_types:
                 scores, val = ref[col], row[col]
@@ -77,17 +76,17 @@ def compute_percentiles(
     return out
 
 
-def postprocess_group_features(group_df, feat_types):
+def _fill_group(group_df, feat_types, ref_lvl=None):
     """
-    Compute the percentile score for a set of features and a reference pop.
+    TODO
 
     Parameters
     ----------
     group_df : pd.DataFrame
-        The input data; it should correspond to a single gorup (normally
+        The input data; it should correspond to a single group (normally
         dementia patients).
     feat_types : List[str]
-        The names of the features columns to use.
+        The names of the feature columns to use.
 
     Returns
     -------
@@ -96,19 +95,20 @@ def postprocess_group_features(group_df, feat_types):
 
     """
     gby = group_df.groupby("level")
-
-    # Select the lowest level which we assume holds the most ids
     keys = list(gby.groups.keys())
-    min_level = min(keys)
-    keys.remove(min_level)
 
-    # The reference (lowest level)
-    base_df = gby.get_group(min_level).set_index("id")
+    if ref_lvl is None:
+        # Select the lowest level which we assume holds the most ids
+        ref_lvl = min(keys)
+
+    # The reference data
+    base_df = gby.get_group(ref_lvl).set_index("id")
     demo_cols = list(set(base_df.columns).difference(feat_types))
     demo_cols.remove("level")
 
     out = [base_df]
 
+    keys.remove(ref_lvl)
     for k in keys:
         lvl = gby.get_group(k).set_index("id")
 
@@ -123,9 +123,9 @@ def postprocess_group_features(group_df, feat_types):
     return out_df.sort_values(["level", "id"]).reset_index(drop=True)
 
 
-def fill_missing_attempts(df, feat_types, missing_group="ad"):
+def fill_missing_attempts(df, feat_types, missing_group="ad", ref_lvl=None):
     """
-    Compute the percentile score for a set of features and a reference pop.
+    TODO
 
     Parameters
     ----------
@@ -145,7 +145,9 @@ def fill_missing_attempts(df, feat_types, missing_group="ad"):
     # TODO: use get_iterable to make missing_group accept more than one
 
     gby = df.groupby("group")
-    process_df = postprocess_group_features(gby.get_group(missing_group), feat_types)
+    group_df = gby.get_group(missing_group)
+
+    process_df = _fill_group(group_df, feat_types, ref_lvl=ref_lvl)
 
     out = [process_df]
 

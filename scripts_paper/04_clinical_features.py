@@ -33,7 +33,7 @@ clinical_paths_df = read_path_feather(clinical_paths, path_col="trajectory_data"
 abs_cols = ["len", "curv", "bdy"]
 rel_cols = ["fro", "sup", "match", "mob", "vo"]
 idx_cols = ["id", "group"]
-all_cols = ["dur"] + abs_cols + rel_cols
+feat_types = ["dur"] + abs_cols + rel_cols
 
 
 hp = {
@@ -45,13 +45,15 @@ hp = {
 }
 
 inner_bdy_radii = {
+    1: {"bdy_rin": 1, "bdy_rout": 2},
+    2: {"bdy_rin": 1, "bdy_rout": 2},
     6: {"bdy_rin": 1.5, "bdy_rout": 4},
     8: {"bdy_rin": 1.5, "bdy_rout": 4},
     11: {"bdy_rin": 1, "bdy_rout": 2},
 }
 
 
-levels = [6, 8, 11]
+levels = [1, 2, 6, 8, 11]
 genders = ["f", "m"]
 nb_iters = len(levels) * len(genders)
 
@@ -94,7 +96,12 @@ if __name__ == "__main__":
         )
 
     # Post-process the missing AD patients and fill with NA
-    features_df = fill_missing_attempts(features_df, all_cols, missing_group="ad")
+    features_df = fill_missing_attempts(
+        features_df,
+        feat_types,
+        missing_group="ad",
+        ref_lvl=6,  # we make sure to use the first level that we care about for features
+    )
 
     # Write file
     if save:

@@ -22,51 +22,67 @@ grid_dir = data_dir / "maps"
 paths_dir = data_dir / "normative" / "paths"
 features_dir = data_dir / "normative" / "features"
 
-#  paths_loader = LevelsLoader(paths_dir, fmt="feather")
-features_loader = LevelsLoader(features_dir, fmt="feather")
 
-
-# Clinical
-#  clinical_features = data_dir / "clinical" / "features.feather"
-#  clinical_paths = data_dir / "clinical" / "paths.feather"
-
-#  clinical_features_df = feather.read_feather(clinical_features)
-
-
-def load_mixed_genders(level, age="50:"):
-    f = features_loader.get(level, "f", age=age)
-    m = features_loader.get(level, "m", age=age)
+def load_mixed_genders(level, age="50:", **kwargs):
+    f = features_loader.get(level, "f", age=age, **kwargs)
+    m = features_loader.get(level, "m", age=age, **kwargs)
     df = pd.concat((f, m)).reset_index(drop=True)
     idx = vo_correctness(df.vo, level, verbose=True)
 
     return df, idx
 
 
-def prepare_roc_auc_data(df, idx, feat_types=cols):
+def prepare_roc_auc_data(feat_types=cols):
     roc_xy_dict = {}
     auc_dict = {}
 
-    label = idx.astype(int)
+    for lvl in levels_shq:
+        df, idx = load_mixed_genders(level=lvl)
+        label = idx.astype(int)
 
-    for feat in feat_types:
-        score = -df[feat]  # roc definition has incorrect group (voc-0) first hence -1
+        for feat in feat_types:
+            # roc definition has incorrect group (voc-0) first, hence minus sign
+            score = -df[feat]
 
-        fpr, tpr, _ = metrics.roc_curve(label, score)  # 3rd argument is thresholds
-        roc_xy_dict[feat] = (fpr, tpr)
-        auc_dict[feat] = metrics.roc_auc_score(label, score)
+            fpr, tpr, _ = metrics.roc_curve(label, score)  # 3rd argument is thresholds
+            roc_xy_dict[(lvl, feat)] = (fpr, tpr)
+
+            auc_dict[(lvl, feat)] = metrics.roc_auc_score(label, score)
 
     return roc_xy_dict, auc_dict
 
 
-if __name__ == "__main__":
+def prepare_correls():
+    correls = {}
 
-    save = False
+    for lvl in levels_shq:
+        df, _ = load_mixed_genders(level=lvl)
+        correls[lvl] = df.corr()
+
+    return correls
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--norm", action="store_true")
+    args = parser.parse_args()
+
+    norm = args.norm
+    preffix = "normed_" if norm else ""
+
+    features_loader = LevelsLoader(features_dir)
+
+    save = True
 
     # Level 6 for the feature separation depending on VO
     lvl = 6
-    df, idx = load_mixed_genders(level=lvl)
+    df, idx = load_mixed_genders(level=lvl, norm=norm, feat_types=cols)
+    isna = df.len.isna()
+    df, idx = df.loc[~isna], idx[~isna]
 
-    filename = save_dir / f"dataframe_level{lvl:02}.pkl"
+    filename = save_dir / f"{preffix}dataframe_level{lvl:02}.pkl"
 
     if save:
         with open(filename, "wb") as f:
@@ -74,21 +90,8 @@ if __name__ == "__main__":
             print(f"\nSaved level {lvl} to: {filename}\n")
 
     # The 3 levels for AUC and ROC
-    auc = {}
-    roc_xy = {}
-    correls = {}
-
-    # We use level 6 wich was previously loaded
-    roc_xy[lvl], auc[lvl] = prepare_roc_auc_data(df, idx)
-    correls[lvl] = df.corr()
-    levels_shq.remove(lvl)
-
-    for lvl in levels_shq:
-        df, idx = load_mixed_genders(level=lvl)
-        roc_xy[lvl], auc[lvl] = prepare_roc_auc_data(df, idx)
-        correls[lvl] = df.corr()
-
-    filename = save_dir / "roc-auc_three-levels.pkl"
+    roc_xy, auc = prepare_roc_auc_data()
+    filename = save_dir / f"{preffix}roc-auc_three-levels.pkl"
 
     if save:
         with open(filename, "wb") as f:
@@ -96,7 +99,8 @@ if __name__ == "__main__":
             print("\nSaved roc-auc data to: ", filename)
 
     # Correlations
-    filename = save_dir / "correls_three-levels.pkl"
+    correls = prepare_correls()
+    filename = save_dir / f"{preffix}correls_three-levels.pkl"
 
     if save:
         with open(filename, "wb") as f:

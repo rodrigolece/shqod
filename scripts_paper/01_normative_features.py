@@ -34,13 +34,15 @@ hp = {
 }
 
 inner_bdy_radii = {
+    1: {"bdy_rin": 1, "bdy_rout": 2},
+    2: {"bdy_rin": 1, "bdy_rout": 2},
     6: {"bdy_rin": 1.5, "bdy_rout": 4},
     8: {"bdy_rin": 1.5, "bdy_rout": 4},
     11: {"bdy_rin": 1, "bdy_rout": 2},
 }
 
 
-levels = [6, 8, 11]
+levels = [1, 2, 6, 8, 11]
 genders = ["f", "m"]
 nb_iters = len(levels) * len(genders)
 
@@ -62,8 +64,9 @@ def process_level_gender(key):
     feat_df = feat_df.join(nfeat_df[nkeys])
 
     # Write file
-    filename = output_dir / f"level_{lvl}_uk_{g}.feather"
-    feather.write_feather(feat_df, filename)
+    if False:
+        filename = output_dir / f"level_{lvl}_uk_{g}.feather"
+        feather.write_feather(feat_df, filename)
 
     # This should free up memory, though in paralell it might not help much
     paths_loader.loaded.pop((lvl, g), None)

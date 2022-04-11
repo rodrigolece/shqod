@@ -33,16 +33,11 @@ orig_cycler = plt.rcParams.get("axes.prop_cycle")
 # We select particular colors for the clinical groups
 color_map = dict(zip(["e3e3", "e3e4", "e4e4", "ad"], orig_cycler.by_key()["color"][:4]))
 
-
-# Data
-load_dir = Path("data_intermediate")
-figures_dir = Path("figures")
-
-boxplot_filename = load_dir / "clinical-long-percentiles_three-levels.pkl"
-assert os.path.isfile(boxplot_filename)
+work_dir = Path(os.environ["dementia"]) / "code" / "shqod" / "scripts_paper"
+figures_dir = work_dir / "figures"
 
 
-def main(groups):
+def main(boxplot_filename, groups):
     fig = plt.figure(figsize=(7.0, 8.0))
 
     gs = fig.add_gridspec(
@@ -67,19 +62,29 @@ def main(groups):
 
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("filename", help="input data")
+    args = parser.parse_args()
 
     save = True
+
+    # data_intermediate/clinical-long-percentiles_three-levels.pkl
+    boxplot_filename = Path(args.filename)
+    assert boxplot_filename.is_file()
+    preffix = "normed_" if "normed" in str(boxplot_filename.name) else ""
 
     groups = ["e3e3", "e3e4", "ad"]
     # custom_cycler = cycler(color=[color_map[g] for g in groups])
     custom_cycler = cycler(color=["#00ABE8", "#FF7F0E", "#EB1928"])  # Uzu's edit
     plt.rcParams.update({"axes.prop_cycle": custom_cycler})
 
-    fig = main(groups)
+    fig = main(boxplot_filename, groups)
 
     if save:
-        filename = figures_dir / "panel_boxplot.pdf"
-        fig.savefig(filename)  # bbox_inches="tight" mess the alignment
+        filename = figures_dir / f"{preffix}panel_boxplot.pdf"
+        fig.savefig(filename)  # bbox_inches="tight"
         print("Saved to: ", filename)
 
     print("\nDone!\n")
