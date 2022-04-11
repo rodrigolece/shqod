@@ -2,6 +2,8 @@
 *.log
 shqod.egg-info
 
+**/*TODO*
+
 scripts/deprecated/
 scripts/data_intermediate/
 scripts/figures/
