@@ -96,27 +96,22 @@ def plot_quartiles_by_vo(
 
 def plot_roc_curves(
     ax,
-    filename,
+    roc_xy,
     col,
     levels=[6, 8, 11],
     legend=True,
     loc="lower right",
     verbose=False,
 ):
-    if verbose:
-        print("\nLoading: ", filename)
-
-    with open(filename, "rb") as f:
-        data = pickle.load(f)
-
-    roc = data["roc_xy"]
 
     for lvl in levels:
-        xy = roc[lvl][col]
+        # xy = roc_xy[lvl][col]
+        xy = roc_xy[(lvl, col)]
         ax.plot(*xy, label=f"Level {lvl}", lw=2.5)
 
     ax.set_xlim((-0.1, 1.1))
     ax.set_ylim((-0.1, 1.1))
+    ax.set_aspect("equal")
     x, X, y, Y = ax.axis()
     mM = max(x, y), min(X, Y)
     ax.plot(mM, mM, ls="dotted", c=".3", alpha=0.5)  # , label="y=x (diagonal)")
