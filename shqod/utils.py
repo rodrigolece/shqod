@@ -3,14 +3,24 @@
 from collections.abc import Iterable
 
 import numpy as np
+from scipy import stats
 
 
 def _get_iterable(x):
     """Utility function."""
-    if isinstance(x, Iterable) and not isinstance(x, str):
-        return x
-    else:
-        return (x,)
+    out = x if isinstance(x, Iterable) and not isinstance(x, str) else (x,)
+
+    return out
+
+
+def confidence_interval(auc, std, alpha=0.95):
+    offset = (1 - alpha) / 2
+    percentiles = np.array([offset, 1 - offset])
+
+    out = stats.norm.ppf(percentiles, loc=auc, scale=std)
+    out[out > 1] = 1
+
+    return out
 
 
 def sigmoid_ftn(x):

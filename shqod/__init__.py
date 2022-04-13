@@ -14,6 +14,8 @@ from shqod.proc import (
     RelProcessor,
     compute_percentiles,
     fill_missing_attempts,
+    compute_pvalues,
+    compute_auc,
 )
 
 from shqod.matrices import (

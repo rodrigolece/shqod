@@ -1,14 +1,17 @@
 """Some processing functions for features."""
 
 import itertools
-from typing import List
+from typing import List, Union
 
 import numpy as np
 import scipy.stats as st
 import pandas as pd
 
+# from sklearn import metrics
+
 from shqod.io import LevelsLoader
-from shqod.utils import _get_iterable
+from shqod.utils import _get_iterable, confidence_interval
+from shqod.auc import delong_roc_variance
 
 
 def compute_percentiles(
@@ -156,3 +159,57 @@ def fill_missing_attempts(df, feat_types, missing_group="ad", ref_lvl=None):
             out.append(group)
 
     return pd.concat(out).reset_index(drop=True)
+
+
+def compute_pvalues(
+    lvl_df: pd.DataFrame,
+    feat_types: List[str],
+    label: str = None,
+    equal_var: bool = False,
+):
+    label = "label" if label is None else label
+    if label not in lvl_df:
+        raise ValueError
+
+    label = lvl_df[label]
+    gs = label.unique()
+    assert len(gs) == 2
+
+    idx = label == gs[0]
+    first = lvl_df.loc[idx]
+    second = lvl_df.loc[~idx]
+
+    pvals = [
+        st.ttest_ind(first[feat], second[feat], equal_var=equal_var).pvalue
+        for feat in feat_types
+    ]
+
+    idx = pd.Index(feat_types, name="metric")
+
+    return pd.Series(pvals, index=idx, name="pvals")
+
+
+def _ci_wrapper(row, alpha=0.95):
+    return confidence_interval(row["auc"], row["std"], alpha=alpha)
+
+
+def compute_auc(lvl_df: pd.DataFrame, feat_types: List[str], label: str = None):
+    label = "label" if label is None else label
+    if label not in lvl_df:
+        raise ValueError
+
+    label = lvl_df[label].values  # delong_roc_var takes np.array
+    vals = []
+
+    for feat in feat_types:
+        score = lvl_df[feat].values
+        # auc = metrics.roc_auc_score(label, score)
+        vals.append(delong_roc_variance(label, score))
+
+    idx = pd.Index(feat_types, name="metric")
+    out = pd.DataFrame(vals, columns=["auc", "var"], index=idx)
+
+    out["std"] = out["var"].apply(np.sqrt)
+    out[["CI_low", "CI_high"]] = out.apply(_ci_wrapper, axis=1, result_type="expand")
+
+    return out.drop(columns="var")

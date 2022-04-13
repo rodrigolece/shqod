@@ -11,11 +11,7 @@ def main(filename):
         data = pickle.load(f)["auc"]
 
     for gp in ["e3e4", "ad"]:
-        rows = [(lvl, col, val) for (lvl, col), val in data[gp].items()]
-        df = pd.DataFrame(rows).set_index([0, 1]).unstack()[2][cols]
-        df.columns.name = ""
-        df.index.name = "level"
-        df = df.reset_index()
+        df = data[gp]
 
         print("Group: ", gp)
         print(df.round(3))

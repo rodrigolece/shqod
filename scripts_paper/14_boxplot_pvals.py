@@ -6,7 +6,7 @@ import numpy as np
 import scipy.stats as st
 import pyarrow.feather as feather
 
-from shqod import LevelsLoader, compute_percentiles
+from shqod import LevelsLoader, compute_percentiles, compute_pvalues
 from draw import cols, levels_shq
 
 
@@ -48,52 +48,44 @@ normed_percentiles_df = compute_percentiles(
 def pvalues(df, other, ref="e3e3", feat_types=cols, equal_var=False):
     """Calculate p-values for the given groups."""
 
-    idx1 = df.group == ref
-    idx2 = df.group == other
+    groups = df.loc[df.group.isin([ref, other])].copy()
+    groups["label"] = (groups["group"] == other).astype(int)
+
+    gby = groups.groupby("level")
 
     out = []
 
     for lvl in levels_shq:
-        idx_lvl = df.level == lvl
+        lvl_df = gby.get_group(lvl)
 
-        first = df.loc[idx_lvl & idx1]
-        second = df.loc[idx_lvl & idx2]
+        pvals = compute_pvalues(lvl_df, feat_types).reset_index()
+        pvals["level"] = lvl
+        out.append(pvals)
 
-        pvals = [
-            st.ttest_ind(first[col], second[col], equal_var=equal_var).pvalue
-            for col in feat_types
-        ]
-        row = pd.DataFrame([pvals], columns=cols)
-        row["level"] = lvl
-
-        out.append(row)
-
-    return pd.concat(out, ignore_index=True)[["level"] + feat_types]
+    return pd.concat(out).set_index(["level", "metric"])
 
 
 if __name__ == "__main__":
 
+    groups = ["e3e4", "ad"]
+
     save = False
 
-    for gp in ["e3e4", "ad"]:
-        print("\nGroup: ", gp)
+    filenames = ["pvals_boxplots.csv", "pvals_boxplots_normed.csv"]
+    dfs = [clinical_percentiles_df, normed_percentiles_df]
 
-        print("\nWithout normalisation")
-        pvals = pvalues(clinical_percentiles_df, gp)
-        print(pvals.round(3))
+    headers = ["\nWithout normalisation", "\nCorrected for gameplay (levels 1 + 2)"]
 
-        if save:
-            filename = save_dir / f"pvals-ttest-ind_boxplots_gp-{gp}.csv"
-            pvals.to_csv(filename, index=False)
-            print("\nSaved: ", filename)
-
-        print("\nCorrected for gameplay (levels 1 + 2)")
-        pvals = pvalues(normed_percentiles_df, gp)
-        print(pvals.round(3))
+    for data, fname, hdr in zip(dfs, filenames, headers):
+        pvals = [pvalues(data, g) for g in groups]
+        pvals_df = pd.concat(pvals, axis=1)
+        pvals_df.columns = groups
+        print(hdr)
+        print(pvals_df.round(3))
 
         if save:
-            filename = save_dir / f"normed-pvals-ttest-ind_boxplots_gp-{gp}.csv"
-            pvals.to_csv(filename, index=False)
+            filename = save_dir / fname
+            pvals_df.to_csv(filename)
             print("\nSaved: ", filename)
 
     print("\nDone!\n")

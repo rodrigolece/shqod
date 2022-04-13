@@ -84,13 +84,13 @@ if __name__ == "__main__":
     # data_intermediate/roc-auc_boxplots.pkl
     roc_filename = Path(args.filename)
     assert roc_filename.is_file()
-    preffix = "normed_" if "normed" in str(roc_filename.name) else ""
+    suffix = "_normed" if "normed" in str(roc_filename.name) else ""
 
     # The figures
     for gp in ["e3e4", "ad"]:
         fig = panels(roc_filename, gp)
         if save:
-            save_name = figures_dir / f"{preffix}roc-boxplots_{gp[-2:]}.pdf"
+            save_name = figures_dir / f"roc-boxplots_{gp[-2:]}{suffix}.pdf"
             fig.savefig(save_name)
             print("Saved to: ", save_name)
 

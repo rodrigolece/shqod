@@ -7,7 +7,7 @@ from sklearn import metrics
 
 #  import pyarrow.feather as feather
 
-from shqod import LevelsLoader, vo_correctness
+from shqod import LevelsLoader, vo_correctness, compute_auc, compute_pvalues
 from draw import cols, levels_shq
 
 
@@ -22,6 +22,8 @@ grid_dir = data_dir / "maps"
 paths_dir = data_dir / "normative" / "paths"
 features_dir = data_dir / "normative" / "features"
 
+features_loader = LevelsLoader(features_dir)
+
 
 def load_mixed_genders(level, age="50:", **kwargs):
     f = features_loader.get(level, "f", age=age, **kwargs)
@@ -32,32 +34,65 @@ def load_mixed_genders(level, age="50:", **kwargs):
     return df, idx
 
 
-def prepare_roc_auc_data(feat_types=cols):
+def roc_curves(norm, feat_types=cols):
     roc_xy_dict = {}
-    auc_dict = {}
 
     for lvl in levels_shq:
-        df, idx = load_mixed_genders(level=lvl)
-        label = idx.astype(int)
+        df, idx = load_mixed_genders(level=lvl, norm=norm, feat_types=feat_types)
+        label = idx.astype(int).values
 
         for feat in feat_types:
             # roc definition has incorrect group (voc-0) first, hence minus sign
-            score = -df[feat]
+            score = -df[feat].values
 
             fpr, tpr, _ = metrics.roc_curve(label, score)  # 3rd argument is thresholds
             roc_xy_dict[(lvl, feat)] = (fpr, tpr)
 
-            auc_dict[(lvl, feat)] = metrics.roc_auc_score(label, score)
+            # auc = metrics.roc_auc_score(label, score)
+            # auc_delong, variance = delong_roc_variance(label, score)
+            # auc_dict[(lvl, feat)] = (auc, auc_delong, variance)
 
-    return roc_xy_dict, auc_dict
+    return roc_xy_dict
 
 
-def prepare_correls():
+def aucs(norm, feat_types=cols):
+    out = []
+
+    for lvl in levels_shq:
+        df, idx = load_mixed_genders(level=lvl, norm=norm, feat_types=feat_types)
+        idx = vo_correctness(df.vo, lvl)
+        df["label"] = (~idx).astype(int)
+        df = df.dropna()
+
+        auc = compute_auc(df, feat_types).reset_index()
+        auc["level"] = lvl
+        out.append(auc)
+
+    return pd.concat(out).set_index(["level", "metric"])
+
+
+def pvalues(norm, feat_types=cols):
+    out = []
+
+    for lvl in levels_shq:
+        df, idx = load_mixed_genders(level=lvl, norm=norm, feat_types=feat_types)
+        idx = vo_correctness(df.vo, lvl)
+        df["label"] = (~idx).astype(int)
+        df = df.dropna()
+
+        pvals = compute_pvalues(df, feat_types).reset_index()
+        pvals["level"] = lvl
+        out.append(pvals)
+
+    return pd.concat(out).set_index(["level", "metric"])
+
+
+def prepare_correls(norm, feat_types=cols):
     correls = {}
 
     for lvl in levels_shq:
-        df, _ = load_mixed_genders(level=lvl)
-        correls[lvl] = df.corr()
+        df, _ = load_mixed_genders(level=lvl, norm=norm, feat_types=feat_types)
+        correls[lvl] = df[feat_types].corr()
 
     return correls
 
@@ -70,41 +105,47 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     norm = args.norm
-    preffix = "normed_" if norm else ""
+    suffix = "_normed" if norm else ""
 
-    features_loader = LevelsLoader(features_dir)
+    save = False
 
-    save = True
+    # # Level 6 for the feature separation depending on VO
+    # lvl = 6
+    # df, idx = load_mixed_genders(level=lvl, norm=norm, feat_types=cols)
+    # isna = df.len.isna()
+    # df, idx = df.loc[~isna], idx[~isna]
 
-    # Level 6 for the feature separation depending on VO
-    lvl = 6
-    df, idx = load_mixed_genders(level=lvl, norm=norm, feat_types=cols)
-    isna = df.len.isna()
-    df, idx = df.loc[~isna], idx[~isna]
+    # filename = save_dir / f"dataframe_level{lvl:02}{suffix}.pkl"
 
-    filename = save_dir / f"{preffix}dataframe_level{lvl:02}.pkl"
+    # if save:
+    #     with open(filename, "wb") as f:
+    #         pickle.dump({"df": df, "idx": idx}, f)
+    #         print(f"\nSaved level {lvl} to: {filename}\n")
 
-    if save:
-        with open(filename, "wb") as f:
-            pickle.dump({"df": df, "idx": idx}, f)
-            print(f"\nSaved level {lvl} to: {filename}\n")
+    # # ROC curves (three levels)
+    # roc_xy = roc_curves(norm)
+    # filename = save_dir / f"roc_three-levels{suffix}.pkl"
 
-    # The 3 levels for AUC and ROC
-    roc_xy, auc = prepare_roc_auc_data()
-    filename = save_dir / f"{preffix}roc-auc_three-levels.pkl"
+    # if save:
+    #     with open(filename, "wb") as f:
+    #         pickle.dump({"roc_xy": roc_xy}, f)
+    #         print("\nSaved roc data to: ", filename)
 
-    if save:
-        with open(filename, "wb") as f:
-            pickle.dump({"auc": auc, "roc_xy": roc_xy}, f)
-            print("\nSaved roc-auc data to: ", filename)
+    # AUC + p-vals (three levels)
+    comparison_df = aucs(norm).join(pvalues(norm))
+    filename = save_dir / f"auc-pvals_three-levels{suffix}.pkl"
 
-    # Correlations
-    correls = prepare_correls()
-    filename = save_dir / f"{preffix}correls_three-levels.pkl"
+    if True:
+        comparison_df.to_pickle(filename)
+        print("\nSaved auc data to: ", filename)
 
-    if save:
-        with open(filename, "wb") as f:
-            pickle.dump({"correls": correls}, f)
-            print("\nSaved correlation data to: ", filename)
+    # # Correlations (three levels)
+    # correls = prepare_correls(norm)
+    # filename = save_dir / f"correls_three-levels{suffix}.pkl"
+
+    # if save:
+    #     with open(filename, "wb") as f:
+    #         pickle.dump({"correls": correls}, f)
+    #         print("\nSaved correlation data to: ", filename)
 
     print("\nDone!\n")

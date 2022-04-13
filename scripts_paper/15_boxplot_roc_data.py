@@ -1,12 +1,14 @@
 import os
 from pathlib import Path
 import pickle
+from typing import List
 
 import numpy as np
+import pandas as pd
 from sklearn import metrics
 import pyarrow.feather as feather
 
-from shqod import LevelsLoader, compute_percentiles
+from shqod import LevelsLoader, compute_percentiles, compute_auc
 from draw import cols, levels_shq
 
 
@@ -45,9 +47,10 @@ normed_percentiles_df = compute_percentiles(
 )
 
 
-def prepare_roc_auc_data(df, other, ref="e3e3", feat_types=cols):
+def roc_curves(
+    df: pd.DataFrame, other: str, ref: str = "e3e3", feat_types: List[str] = cols
+):
     roc_xy_dict = {}
-    auc_dict = {}
 
     for g in [ref, other]:
         assert g in df.group.unique()
@@ -57,7 +60,6 @@ def prepare_roc_auc_data(df, other, ref="e3e3", feat_types=cols):
     for lvl in levels_shq:
         lvl_df = df.loc[(df.level == lvl) & idx_group]
         label = lvl_df.group == other
-        print(label.value_counts())
 
         for feat in feat_types:
             score = lvl_df[feat]
@@ -65,16 +67,34 @@ def prepare_roc_auc_data(df, other, ref="e3e3", feat_types=cols):
             fpr, tpr, _ = metrics.roc_curve(label, score)  # 3rd argument is thresholds
             roc_xy_dict[(lvl, feat)] = (fpr, tpr)
 
-            auc_dict[(lvl, feat)] = metrics.roc_auc_score(label, score)
+            # auc_dict[(lvl, feat)] = metrics.roc_auc_score(label, score)
 
-    return roc_xy_dict, auc_dict
+    return roc_xy_dict
+
+
+def aucs(df, other, ref="e3e3", feat_types=cols):
+    groups = df.loc[df.group.isin([ref, other])].copy()
+    groups["label"] = (groups["group"] == other).astype(int)
+
+    gby = groups.groupby("level")
+
+    out = []
+
+    for lvl in levels_shq:
+        lvl_df = gby.get_group(lvl).dropna(subset=feat_types)
+
+        auc = compute_auc(lvl_df, feat_types).reset_index()
+        auc["level"] = lvl
+        out.append(auc)
+
+    return pd.concat(out).set_index(["level", "metric"])
 
 
 if __name__ == "__main__":
 
     save = False
 
-    filenames = ["roc-auc_boxplots.pkl", "normed-roc-auc_boxplots.pkl"]
+    filenames = ["roc-auc_boxplots.pkl", "roc-auc_boxplots_normed.pkl"]
     dfs = [clinical_percentiles_df, normed_percentiles_df]
 
     for data, fname in zip(dfs, filenames):
@@ -82,7 +102,8 @@ if __name__ == "__main__":
         roc_xy = {}
 
         for gp in ["e3e4", "ad"]:
-            roc_xy[gp], auc[gp] = prepare_roc_auc_data(data, gp, ref="e3e3")
+            roc_xy[gp] = roc_curves(data, gp, ref="e3e3")
+            auc[gp] = aucs(data, gp, ref="e3e3")
 
         if save:
             filename = save_dir / fname
