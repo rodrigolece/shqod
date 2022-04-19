@@ -1,6 +1,7 @@
 """Utility functions, varied."""
 
 from collections.abc import Iterable
+import re
 
 import numpy as np
 from scipy import stats
@@ -11,6 +12,19 @@ def _get_iterable(x):
     out = x if isinstance(x, Iterable) and not isinstance(x, str) else (x,)
 
     return out
+
+
+def parse_age(age_str):
+    """Utility function."""
+    match = re.search("^(\d*):(\d*)$", age_str)
+    if match:
+        low, high = match.groups()
+        low = 0 if low == "" else int(low)
+        high = 99 if high == "" else int(high)
+    else:
+        raise ValueError("invalid format for age")
+
+    return low, high
 
 
 def confidence_interval(auc, std, alpha=0.95):

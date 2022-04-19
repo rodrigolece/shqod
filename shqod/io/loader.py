@@ -8,6 +8,7 @@ import pyarrow.feather as feather
 
 from shqod.io.read import read_path_csv, read_path_feather
 from shqod.paths import vo_correctness
+from shqod.utils import parse_age
 
 
 class LevelsLoader(object):
@@ -109,15 +110,7 @@ class LevelsLoader(object):
         assert type(age) in (int, str) or age is None, "invalid type for age"
 
         if isinstance(age, str):
-            pattern = r"^(\d*):(\d*)$"
-            match = re.search(pattern, age)
-            if match:
-                low, high = match.groups()
-                low = 0 if low == "" else int(low)
-                high = 99 if high == "" else int(high)
-            else:
-                raise ValueError("invalid format for age")
-
+            low, high = parse_age(age)
         elif isinstance(age, int):
             low, high = age, age
 
