@@ -26,7 +26,7 @@ norm_loader = paths_loader  # used inside the normative processor
 # the normative paths
 
 clinical_paths = data_dir / "clinical" / "paths.feather"
-output_name = data_dir / "clinical" / "features.feather"  # clinical_features
+output_name = data_dir / "clinical" / "features_modified.feather"  # clinical_features
 clinical_paths_df = read_path_feather(clinical_paths, path_col="trajectory_data")
 
 

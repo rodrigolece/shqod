@@ -40,15 +40,15 @@ def normalise(feat_df, levels):
 
 if __name__ == "__main__":
 
-    save = False
+    save = True
 
-    clinical_features = data_dir / "clinical" / "features.feather"
+    clinical_features = data_dir / "clinical" / "features_modified.feather"
     feat_df = feather.read_feather(clinical_features)
     levels = [6, 8, 11]
 
     norm_df = normalise(feat_df, levels)
 
     if save:
-        save_name = clinical_features.parent / "normed_features.feather"
+        save_name = clinical_features.parent / "normed_features_modified.feather"
         feather.write_feather(norm_df, save_name, compression="zstd")
         print("\nSaved results to: ", save_name)

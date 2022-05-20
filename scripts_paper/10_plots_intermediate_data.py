@@ -12,7 +12,7 @@ from draw import cols, levels_shq
 
 
 data_dir = Path(os.environ["dementia"]) / "data"
-save_dir = Path("data_intermediate")
+save_dir = Path("data_intermediate_modified")
 
 
 # The maps
@@ -20,7 +20,7 @@ grid_dir = data_dir / "maps"
 
 # Normative
 paths_dir = data_dir / "normative" / "paths"
-features_dir = data_dir / "normative" / "features"
+features_dir = data_dir / "normative" / "features_modified"
 
 features_loader = LevelsLoader(features_dir)
 
@@ -39,6 +39,9 @@ def roc_curves(norm, feat_types=cols):
 
     for lvl in levels_shq:
         df, idx = load_mixed_genders(level=lvl, norm=norm, feat_types=feat_types)
+        idx_na = df["dur"].notna()
+        df = df.loc[idx_na]
+        idx = idx[idx_na]
         label = idx.astype(int).values
 
         for feat in feat_types:
@@ -107,45 +110,45 @@ if __name__ == "__main__":
     norm = args.norm
     suffix = "_normed" if norm else ""
 
-    save = False
+    save = True
 
-    # # Level 6 for the feature separation depending on VO
-    # lvl = 6
-    # df, idx = load_mixed_genders(level=lvl, norm=norm, feat_types=cols)
-    # isna = df.len.isna()
-    # df, idx = df.loc[~isna], idx[~isna]
+    # Level 6 for the feature separation depending on VO
+    lvl = 6
+    df, idx = load_mixed_genders(level=lvl, norm=norm, feat_types=cols)
+    isna = df.len.isna()
+    df, idx = df.loc[~isna], idx[~isna]
 
-    # filename = save_dir / f"dataframe_level{lvl:02}{suffix}.pkl"
+    filename = save_dir / f"dataframe_level{lvl:02}{suffix}.pkl"
 
-    # if save:
-    #     with open(filename, "wb") as f:
-    #         pickle.dump({"df": df, "idx": idx}, f)
-    #         print(f"\nSaved level {lvl} to: {filename}\n")
+    if save:
+        with open(filename, "wb") as f:
+            pickle.dump({"df": df, "idx": idx}, f)
+            print(f"\nSaved level {lvl} to: {filename}\n")
 
-    # # ROC curves (three levels)
-    # roc_xy = roc_curves(norm)
-    # filename = save_dir / f"roc_three-levels{suffix}.pkl"
+    # ROC curves (three levels)
+    roc_xy = roc_curves(norm)
+    filename = save_dir / f"roc_three-levels{suffix}.pkl"
 
-    # if save:
-    #     with open(filename, "wb") as f:
-    #         pickle.dump({"roc_xy": roc_xy}, f)
-    #         print("\nSaved roc data to: ", filename)
+    if save:
+        with open(filename, "wb") as f:
+            pickle.dump({"roc_xy": roc_xy}, f)
+            print("\nSaved roc data to: ", filename)
 
     # AUC + p-vals (three levels)
     comparison_df = aucs(norm).join(pvalues(norm))
     filename = save_dir / f"auc-pvals_three-levels{suffix}.pkl"
 
-    if True:
+    if save:
         comparison_df.to_pickle(filename)
         print("\nSaved auc data to: ", filename)
 
-    # # Correlations (three levels)
-    # correls = prepare_correls(norm)
-    # filename = save_dir / f"correls_three-levels{suffix}.pkl"
+    # Correlations (three levels)
+    correls = prepare_correls(norm)
+    filename = save_dir / f"correls_three-levels{suffix}.pkl"
 
-    # if save:
-    #     with open(filename, "wb") as f:
-    #         pickle.dump({"correls": correls}, f)
-    #         print("\nSaved correlation data to: ", filename)
+    if save:
+        with open(filename, "wb") as f:
+            pickle.dump({"correls": correls}, f)
+            print("\nSaved correlation data to: ", filename)
 
     print("\nDone!\n")

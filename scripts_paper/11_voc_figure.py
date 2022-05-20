@@ -39,22 +39,22 @@ orig_cycler = plt.rcParams.get("axes.prop_cycle")
 
 
 # Data
-load_dir = Path("data_intermediate")
-figures_dir = Path("figures")
+load_dir = Path("data_intermediate_modified")
+figures_dir = Path("figures_modified")
 
 
-def main(preffix):
-    vo_filename = load_dir / f"{preffix}dataframe_level06.pkl"
+def main(suffix):
+    vo_filename = load_dir / f"dataframe_level06{suffix}.pkl"
     assert vo_filename.is_file()
 
-    roc_filename = load_dir / f"{preffix}roc-auc_three-levels.pkl"
+    roc_filename = load_dir / f"roc_three-levels{suffix}.pkl"
     assert roc_filename.is_file()
 
     with open(roc_filename, "rb") as f:
         roc_xy = pickle.load(f)["roc_xy"]
 
     # The correlations
-    corr_filename = load_dir / f"{preffix}correls_three-levels.pkl"
+    corr_filename = load_dir / f"correls_three-levels{suffix}.pkl"
     assert corr_filename.is_file()
 
     fig = plt.figure(figsize=(7.0, 10.0))  # contrained_layout=True
@@ -159,14 +159,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     norm = args.norm
-    preffix = "normed_" if norm else ""
+    suffix = "_normed" if norm else ""
 
     save = True
 
-    fig = main(preffix)
+    fig = main(suffix)
 
     if save:
-        filename = figures_dir / f"{preffix}panel_vo.pdf"  # svg
+        filename = figures_dir / f"panel_vo{suffix}.pdf"  # svg
         fig.savefig(filename)  # bbox_inches="tight" mess the alignment
         print("Saved to: ", filename)
 

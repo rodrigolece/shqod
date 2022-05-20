@@ -13,7 +13,7 @@ data_dir = Path(os.environ["dementia"]) / "data"
 grid_dir = data_dir / "maps"  # the maps
 
 paths_dir = data_dir / "normative" / "paths"
-output_dir = data_dir / "normative" / "features"  # features_dir
+output_dir = data_dir / "normative" / "features_modified"  # features_dir
 
 paths_loader = LevelsLoader(paths_dir, fmt="feather")
 norm_loader = paths_loader  # used inside the normative processor
@@ -21,8 +21,10 @@ norm_loader = paths_loader  # used inside the normative processor
 # the normative paths
 
 
-keys = ["len", "curv", "bdy"]
-nkeys = ["fro", "sup", "match", "mob", "vo"]
+# keys = ["len", "curv", "bdy"]
+# nkeys = ["fro", "sup", "match", "mob", "vo"]
+keys = ["curv", "bdy"]
+nkeys = []
 
 
 hp = {
@@ -57,14 +59,14 @@ def process_level_gender(key):
     proc = AbsProcessor(lvl, g, **lvl_hp)
     feat_df = proc.get_smooth_features(df, keys).rename(columns={"duration": "dur"})
 
-    norm_proc = RelProcessor(norm_loader, lvl, g, **lvl_hp)
-    nfeat_df = norm_proc.get_windowed_features(df, nkeys)
+    # norm_proc = RelProcessor(norm_loader, lvl, g, **lvl_hp)
+    # nfeat_df = norm_proc.get_windowed_features(df, nkeys)
 
     # Combine the absolute and relative features
-    feat_df = feat_df.join(nfeat_df[nkeys])
+    # feat_df = feat_df.join(nfeat_df[nkeys])
 
     # Write file
-    if False:
+    if True:
         filename = output_dir / f"level_{lvl}_uk_{g}.feather"
         feather.write_feather(feat_df, filename)
 

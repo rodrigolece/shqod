@@ -12,7 +12,7 @@ from shqod import LevelsLoader, vo_correctness
 data_dir = Path(os.environ["dementia"]) / "data"
 # grid_dir = data_dir / "maps"  # the maps
 
-feat_dir = data_dir / "normative" / "features"
+feat_dir = data_dir / "normative" / "features_modified"
 feat_loader = LevelsLoader(feat_dir, fmt="feather")
 
 
@@ -29,7 +29,7 @@ def norm_sum(ref_lvl, g):
     two = feat_loader.get(2, g).set_index("id").reindex(ref_df.index)
 
     idx_one = vo_correctness(one.vo, 1)
-    idx_two = vo_correctness(one.vo, 2)
+    idx_two = vo_correctness(two.vo, 2)
 
     ref_df.loc[:, feat_types] = (one[feat_types] + two[feat_types]).abs()
 
@@ -42,7 +42,7 @@ def norm_sum(ref_lvl, g):
 
 if __name__ == "__main__":
 
-    save = False
+    save = True
 
     ref_lvl = 6
     genders = ["f", "m"]

@@ -11,6 +11,12 @@ from shqod.matrices import od_matrix  # breakup_by_flags
 from .transform import path2mat, boxcounts
 
 
+def _path_vel(path: np.ndarray) -> float:
+    diff = path[1:] - path[:-1]
+
+    return np.linalg.norm(diff, axis=1)
+
+
 def path_length(path: np.ndarray) -> float:
     """
     Total length of a path.
@@ -25,9 +31,7 @@ def path_length(path: np.ndarray) -> float:
     float
 
     """
-    diff = path[1:] - path[:-1]
-
-    return np.linalg.norm(diff, axis=1).sum()
+    return _path_vel(path).sum()
 
 
 def avg_curvature(path: np.ndarray) -> float:
@@ -44,10 +48,11 @@ def avg_curvature(path: np.ndarray) -> float:
     float
 
     """
-    T = len(path)  # proxy for duration
+    # T = len(path)  # proxy for duration
 
     diff = path[1:] - path[:-1]
     vel = np.linalg.norm(diff, axis=1)
+    length = vel.sum()
 
     # Remove stationary points
     idx = vel > 0
@@ -56,7 +61,7 @@ def avg_curvature(path: np.ndarray) -> float:
 
     diff = diff / vel[:, np.newaxis]
     curv = np.linalg.norm(diff[1:] - diff[:-1], axis=1)
-    avg_curv = np.sum(curv) / T
+    avg_curv = np.sum(curv) / length
 
     return avg_curv
 
@@ -87,14 +92,15 @@ def bdy_affinity(
     float
 
     """
-    T = len(path)  # proxy for duration
+    # T = len(path)  # proxy for duration
+    length = path_length(path)
 
     ds, _ = KDTree(bdy_coords).query(path, k=1)  # second out arg is indices
     ds = ds.flatten()  # otherwise column vector
 
     ds_rescaled = 2 * scale * (ds - (rout + rin) / 2) / (rout - rin)
     sigmoid_vals = sigmoid_ftn(-ds_rescaled)
-    affinity = sigmoid_vals.sum() / T
+    affinity = sigmoid_vals.sum() / length
 
     return affinity
 
