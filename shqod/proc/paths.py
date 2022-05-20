@@ -8,7 +8,8 @@ import numpy as np
 import scipy.sparse as sp
 import scipy.stats as st
 import pandas as pd
-from esig import tosig as pathsig
+
+# from esig import tosig
 
 from shqod.io import LevelsLoader, read_level_grid, read_level_flags
 from shqod.matrices import od_matrix, mobility_field
@@ -77,13 +78,13 @@ class AbsProcessor(object):
 
         return bdy_affinity(path, self.inner_bdy, rin=rin, rout=rout, scale=scale)
 
-    def get_sig(self, path):
-        max_sigdim = getattr(self, "max_sigdim", None)
+    # def get_sig(self, path):
+    #     max_sigdim = getattr(self, "max_sigdim", None)
 
-        if max_sigdim is None:
-            raise ValueError("hyperparameter needed: 'max_sigdim'")
+    #     if max_sigdim is None:
+    #         raise ValueError("hyperparameter needed: 'max_sigdim'")
 
-        return pathsig.stream2logsig(path, self.max_sigdim)
+    #     return tosig.stream2logsig(path, self.max_sigdim)
 
     def get_smooth_features(self, df, feat_types, keys=["id"]):
         #  feat_types = _get_iterable(feat_types)

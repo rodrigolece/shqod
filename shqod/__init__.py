@@ -16,6 +16,7 @@ from shqod.proc import (
     fill_missing_attempts,
     compute_pvalues,
     compute_auc,
+    norm,
 )
 
 from shqod.matrices import (
