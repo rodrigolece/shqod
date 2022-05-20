@@ -6,3 +6,5 @@ from .features import (
     compute_pvalues,
     compute_auc,
 )
+
+from .norm import norm_factor

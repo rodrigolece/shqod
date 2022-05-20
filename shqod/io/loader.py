@@ -1,6 +1,7 @@
 from typing import List, Dict, Union
 
 import os
+from pathlib import Path
 import re
 
 import pandas as pd
@@ -38,6 +39,7 @@ class LevelsLoader(object):
         path_col: str = "trajectory_data",
         raw: bool = False,
         suffix: str = None,
+        country: str = "uk",
     ) -> Dict[str, str]:
         """
         Load the untidy CSV files contained within `directory`.
@@ -49,30 +51,35 @@ class LevelsLoader(object):
             Default is 'csv'.
 
         """
-        if fmt not in ("csv", "feather"):
+        directory = Path(directory)
+
+        if not directory.is_dir():
+            raise ValueError("not a directory")
+
+        elif fmt not in ("csv", "feather"):
             raise ValueError(f"invalid format {fmt}")
 
+        self._country = country
         self.loaded = dict()
-        self.norm_loaded = dict()
         self._files = dict()
-        self._norm_files = dict()
+        self._norm_file = None
+        self.norm_loaded = None
         self._fmt = fmt
         self._path_col = path_col
         self._raw = raw
 
         for file in os.listdir(directory):
-            pattern = rf"_(\d+)_\w*_(f|m){suffix if suffix else ''}.{fmt}"
+            pattern = rf"^level_(\d+)_(\w*)_(f|m){suffix if suffix else ''}.{fmt}"
             if match := re.search(pattern, file):
-                lvl, gender = match.groups()
+                lvl, country, gender = match.groups()
                 key = (int(lvl), gender)
                 self._files[key] = os.path.join(directory, file)
 
-            norm_pattern = rf"^norm_uk_(f|m).{fmt}"
+            norm_pattern = rf"^norm_{self._country}.{fmt}"
             if match := re.search(norm_pattern, file):
-                gender = match.group(1)
-                self._norm_files[gender] = os.path.join(directory, file)
+                self.norm_file = os.path.join(directory, file)
 
-        if self._norm_files:
+        if self._norm_file:
             print("Normative correction found; call `get` with `norm=True`")
 
         return None
@@ -143,21 +150,25 @@ class LevelsLoader(object):
 
         return df
 
-    def _norm_correction(self, level, gender, df, feat_types):
+    def _norm_correction(self, level, df, feat_types):
         if level in [1, 2]:
             raise ValueError("invalid level")
 
-        file = self._norm_files.get(gender)
+        file = self._norm_file
 
         if file:
-            if gender not in self.norm_loaded:
+            if self.norm_loaded is None:
                 method = pd.read_csv if self._fmt == "csv" else feather.read_feather
-                self.norm_loaded[gender] = method(file).set_index("id")
+                df = method(file).set_index("id")
+                assert df.shape[1] == 2
+                # The file should have only two columns: gender and the values
+                col = list(set(df.columns).difference(["gender"]))[0]
+                self.norm_loaded = df[col]
         else:
             raise FileNotFoundError
 
         out = df.copy().set_index("id")
-        norm_df = self.norm_loaded[gender].reindex(out.index)
-        out.loc[:, feat_types] = out[feat_types] / norm_df[feat_types]
+        norm_factor = self.norm_loaded.reindex(out.index)
+        out.loc[:, feat_types] = out[feat_types].divide(norm_factor)
 
         return out.reset_index()
