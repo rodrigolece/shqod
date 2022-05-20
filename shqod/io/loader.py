@@ -77,7 +77,7 @@ class LevelsLoader(object):
 
             norm_pattern = rf"^norm_{self._country}.{fmt}"
             if match := re.search(norm_pattern, file):
-                self.norm_file = os.path.join(directory, file)
+                self._norm_file = os.path.join(directory, file)
 
         if self._norm_file:
             print("Normative correction found; call `get` with `norm=True`")
@@ -146,7 +146,7 @@ class LevelsLoader(object):
         if norm:
             if feat_types is None:
                 raise ValueError("arg `feat_types` is needed when `norm` is `True`")
-            df = self._norm_correction(level, gender, df, feat_types)
+            df = self._norm_correction(level, df, feat_types)
 
         return df
 
@@ -169,6 +169,6 @@ class LevelsLoader(object):
 
         out = df.copy().set_index("id")
         norm_factor = self.norm_loaded.reindex(out.index)
-        out.loc[:, feat_types] = out[feat_types].divide(norm_factor)
+        out.loc[:, feat_types] = out[feat_types].divide(norm_factor, axis=0)
 
         return out.reset_index()

@@ -11,7 +11,7 @@ def _gender_norm_factor(
     feat_loader, gender, ref_lvl=6, col="len", invert_cols=("match", "mob")
 ):
     # We use a reference df just to copy the index and filter out a chunk of the pop
-    ref_ids = feat_loader.get(ref_lvl, g)["id"]
+    ref_ids = feat_loader.get(ref_lvl, gender)["id"]
 
     one = feat_loader.get(1, gender).set_index("id").reindex(ref_ids)
     two = feat_loader.get(2, gender).set_index("id").reindex(ref_ids)
