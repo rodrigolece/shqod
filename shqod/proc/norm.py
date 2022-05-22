@@ -1,6 +1,7 @@
 """Compute the factor for normalization given a directory of features."""
 
 from pathlib import Path
+
 import pandas as pd
 
 from shqod.io import LevelsLoader, write_feather
@@ -47,9 +48,11 @@ def write_norm_factor(
     col="len",
     verbose: bool = True,
 ):
-    feat_loader = LevelsLoader(feat_dir, country=country, fmt="feather")
     if fmt not in ("csv", "feather"):
         raise NotImplementedError
+
+    feat_dir = Path(feat_dir)
+    feat_loader = LevelsLoader(feat_dir, country=country, fmt="feather")
 
     if feat_loader._files:
         df = norm_factor(feat_loader, ref_lvl=ref_lvl, col=col)
@@ -63,3 +66,37 @@ def write_norm_factor(
 
     else:
         raise NameError("results could not be loaded")
+
+
+def normalise_dataframe(
+    feat_df,
+    levels=(6, 8, 11),
+    col="len",
+    invert_cols=("match", "mob"),
+    feat_types = ("dur", "len", "curv", "bdy", "fro", "sup", "match", "mob"),
+    idx_cols=("id", "group"),
+):
+    feat_types = list(feat_types)
+    idx_cols = list(idx_cols)
+
+    gby = feat_df.groupby("level")
+
+    # We compute the correction terms
+    one = gby.get_group(1).set_index(idx_cols)
+    two = gby.get_group(2).set_index(idx_cols)
+
+    norm_factor = (one[col] + two[col]).abs()  # we keep only magnitude
+
+    # Invert the features for which high in magnitude is good
+    if col in invert_cols:
+        norm_factor = 1 / norm_factor
+
+    # Now we compute the normalised features
+    out = []
+
+    for lvl in levels:
+        df = gby.get_group(lvl).set_index(idx_cols)
+        df.loc[:, feat_types] = df[feat_types].divide(norm_factor, axis=0)
+        out.append(df.reset_index())
+
+    return pd.concat(out, ignore_index=True)

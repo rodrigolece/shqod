@@ -7,6 +7,7 @@ from shqod.io import (
     read_level_grid,
     read_level_size,
     read_level_flags,
+    write_feather,
 )
 
 from shqod.proc import (

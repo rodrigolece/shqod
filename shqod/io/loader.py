@@ -159,11 +159,11 @@ class LevelsLoader(object):
         if file:
             if self.norm_loaded is None:
                 method = pd.read_csv if self._fmt == "csv" else feather.read_feather
-                df = method(file).set_index("id")
-                assert df.shape[1] == 2
+                norm_df = method(file).set_index("id")
+                assert norm_df.shape[1] == 2
                 # The file should have only two columns: gender and the values
-                col = list(set(df.columns).difference(["gender"]))[0]
-                self.norm_loaded = df[col]
+                col = list(set(norm_df.columns).difference(["gender"]))[0]
+                self.norm_loaded = norm_df[col]
         else:
             raise FileNotFoundError
 
