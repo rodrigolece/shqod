@@ -6,7 +6,7 @@ from multiprocessing import Pool
 from tqdm import tqdm
 import pyarrow.feather as feather
 
-from shqod import LevelsLoader, AbsProcessor, RelProcessor
+from shqod import LevelsLoader, AbsProcessor, RelProcessor, norm
 
 
 data_dir = Path(os.environ["dementia"]) / "data"
@@ -83,3 +83,5 @@ if __name__ == "__main__":
         iterable = itertools.product(levels, genders)
         list(tqdm(p.imap(process_level_gender, iterable), total=nb_iters))
         # The outer list is required because the evaluation is lazy
+
+    norm.write_norm_factor(output_dir)

@@ -38,12 +38,7 @@ plt.rc("font", **{"family": "sans-serif", "sans-serif": ["Arial"]})
 orig_cycler = plt.rcParams.get("axes.prop_cycle")
 
 
-# Data
-load_dir = Path("data_intermediate_modified")
-figures_dir = Path("figures_modified")
-
-
-def main(suffix):
+def main(load_dir, suffix):
     vo_filename = load_dir / f"dataframe_level06{suffix}.pkl"
     assert vo_filename.is_file()
 
@@ -57,7 +52,7 @@ def main(suffix):
     corr_filename = load_dir / f"correls_three-levels{suffix}.pkl"
     assert corr_filename.is_file()
 
-    fig = plt.figure(figsize=(7.0, 10.0))  # contrained_layout=True
+    fig = plt.figure(figsize=(7, 8))  # contrained_layout=True
 
     gs_a = fig.add_gridspec(
         nrows=2,
@@ -65,23 +60,29 @@ def main(suffix):
         left=0.1,
         right=0.98,
         top=0.96,
-        bottom=0.64,
-        wspace=0.7,
-        hspace=0.1,
+        bottom=0.58,
+        wspace=0.40,
+        hspace=0.25,
     )
     gs_b = fig.add_gridspec(
-        nrows=2, ncols=4, left=0.1, right=0.98, top=0.61, bottom=0.21, hspace=-0.3
-    )
-    gs_c = fig.add_gridspec(
-        nrows=1,
+        nrows=2,
         ncols=4,
-        left=0.068,
-        right=0.92,
-        top=0.17,
-        bottom=0.04,
-        wspace=0.1,
-        width_ratios=(1, 1, 1, 0.1),
+        left=0.1,
+        right=0.98,
+        top=0.49,
+        bottom=0.03,
+        hspace=-0.1,
     )
+    # gs_c = fig.add_gridspec(
+    #     nrows=1,
+    #     ncols=4,
+    #     left=0.068,
+    #     right=0.92,
+    #     top=0.17,
+    #     bottom=0.04,
+    #     wspace=0.1,
+    #     width_ratios=(1, 1, 1, 0.1),
+    # )
 
     panel_label_axes = []
 
@@ -91,6 +92,9 @@ def main(suffix):
 
         leg = i == 0
         plot_quartiles_by_vo(ax, vo_filename, cols[i], legend=leg)
+        ax.ticklabel_format(axis="y", style="sci", scilimits=(-2,2))
+        ax.set_title(ax.get_ylabel()) # TODO: y =
+        ax.set_ylabel("")
 
         if i // 4 == 0:  # top row
             plt.setp(ax.get_xticklabels(), visible=False)
@@ -123,30 +127,28 @@ def main(suffix):
 
     # Panel C
 
-    axes_c = [fig.add_subplot(ss) for ss in gs_c]
+    # axes_c = [fig.add_subplot(ss) for ss in gs_c]
 
-    for i, lvl in enumerate([6, 8, 11]):
-        ax = axes_c[i]
+    # for i, lvl in enumerate([6, 8, 11]):
+    #     ax = axes_c[i]
 
-        if i < 3:
-            ax.set_aspect("equal")
+    #     if i < 3:
+    #         ax.set_aspect("equal")
 
-        cax = axes_c[-1] if i == 0 else None
-        plot_abs_correl(
-            ax, corr_filename, lvl, cax=cax
-        )  # pad=0.02, shrink=0.74, aspect=12
+    #     cax = axes_c[-1] if i == 0 else None
+    #     plot_abs_correl(
+    #         ax, corr_filename, lvl, cax=cax
+    #     )  # pad=0.02, shrink=0.74, aspect=12
 
-        if i in (1, 2):
-            plt.setp(ax.get_yticklabels(), visible=False)
+    #     if i in (1, 2):
+    #         plt.setp(ax.get_yticklabels(), visible=False)
 
-        if i == 0:
-            panel_label_axes.append(ax)
+    #     if i == 0:
+    #         panel_label_axes.append(ax)
 
     # Background, labels, and annotations
     pu.Background(visible=False)
-    pu.add_panel_labels(
-        fig, axes=panel_label_axes, fontsize=18, xs=[-0.3, -0.2, -0.3]
-    )  # ys
+    pu.add_panel_labels( fig, axes=panel_label_axes, fontsize=18, xs=-0.3)  # ys
 
     return fig
 
@@ -155,19 +157,18 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("input_dir")
+    parser.add_argument("--outdir", default="figures")
     parser.add_argument("--norm", action="store_true")
     args = parser.parse_args()
 
-    norm = args.norm
-    suffix = "_normed" if norm else ""
+    input_dir = Path(args.input_dir)
+    figures_dir = Path(args.outdir)
+    suffix = "_normed" if args.norm else ""
 
-    save = True
-
-    fig = main(suffix)
-
-    if save:
-        filename = figures_dir / f"panel_vo{suffix}.pdf"  # svg
-        fig.savefig(filename)  # bbox_inches="tight" mess the alignment
-        print("Saved to: ", filename)
+    fig = main(input_dir, suffix)
+    filename = figures_dir / f"panel_vo{suffix}.pdf"  # svg
+    fig.savefig(filename)  # bbox_inches="tight" mess the alignment
+    print("Saved to: ", filename)
 
     print("\nDone!\n")

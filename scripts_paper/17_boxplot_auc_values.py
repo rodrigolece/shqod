@@ -22,11 +22,14 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("filename", help="input data")
+    parser.add_argument("input_dir")
+    parser.add_argument("--norm", action="store_true")
     args = parser.parse_args()
 
-    # save_dir/roc-auc_boxplots.pkl
-    filename = Path(args.filename)
+    input_dir = Path(args.input_dir)
+    suffix = "_normed" if args.norm else ""
+
+    filename = input_dir / f"roc-auc_boxplots{suffix}.pkl"
     assert filename.is_file()
 
     main(filename)

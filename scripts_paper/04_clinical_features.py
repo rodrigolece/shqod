@@ -9,10 +9,12 @@ import pyarrow.feather as feather
 
 from shqod import (
     read_path_feather,
+    write_feather,
     LevelsLoader,
     AbsProcessor,
     RelProcessor,
     fill_missing_attempts,
+    norm,
 )
 
 
@@ -26,7 +28,6 @@ norm_loader = paths_loader  # used inside the normative processor
 # the normative paths
 
 clinical_paths = data_dir / "clinical" / "paths.feather"
-output_name = data_dir / "clinical" / "features_modified.feather"  # clinical_features
 clinical_paths_df = read_path_feather(clinical_paths, path_col="trajectory_data")
 
 
@@ -88,6 +89,7 @@ def process_level_gender(key):
 if __name__ == "__main__":
 
     save = True
+    suffix = "_modified"  # None
 
     with Pool() as p:
         iterable = itertools.product(levels, genders)
@@ -105,4 +107,11 @@ if __name__ == "__main__":
 
     # Write file
     if save:
-        feather.write_feather(features_df, output_name)
+        filename = clinical_paths.parent / f"features{suffix}.feather"
+        write_feather(features_df, filename, verbose=True)
+
+    # Normed file
+    norm_df = norm.normalise_dataframe(features_df)
+    if save:
+        filename =  clinical_paths.parent / f"normed_features{suffix}.feather"
+        write_feather(norm_df, filename, verbose=True)

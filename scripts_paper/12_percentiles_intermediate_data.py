@@ -8,50 +8,51 @@ from sklearn import metrics
 import pyarrow.feather as feather
 
 from shqod import LevelsLoader, compute_percentiles
-from draw import cols, levels_shq
+from draw import cols as feat_types
 
 
 data_dir = Path(os.environ["dementia"]) / "data"
-save_dir = Path("data_intermediate")
-
 
 # Normative
 features_dir = data_dir / "normative" / "features"
 features_loader = LevelsLoader(features_dir, fmt="feather")
 
-
 # Clinical
 clinical_dir = data_dir / "clinical"
-clinical_features_df = feather.read_feather(clinical_dir / "features.feather")
-normed_features_df = feather.read_feather(clinical_dir / "normed_features.feather")
 
-idx = clinical_features_df.level.isin(levels_shq)
 demo_cols = ["id", "group", "age", "gender", "level"]
-drop_cols = set(clinical_features_df.columns).difference(cols + demo_cols)
-
-clinical_features_df = clinical_features_df.loc[idx].drop(columns=drop_cols)
-normed_features_df = normed_features_df.drop(columns=drop_cols)
 
 
-clinical_percentiles_df = compute_percentiles(
-    clinical_features_df,
-    features_loader,
-    cols,
-    filter_vo=True,
-    fillna=np.inf,
-)
+def main(norm, levels=(6, 8, 11)):
+    preffix = "normed_" if norm else ""
+    filename = clinical_dir / f"{preffix}features.feather"
+    feat_df = feather.read_feather(filename)
+    # normed_features_df = feather.read_feather(filename)
 
-normed_percentiles_df = compute_percentiles(
-    normed_features_df,
-    features_loader,
-    cols,
-    filter_vo=True,
-    norm=True,
-    fillna=np.inf,
-)
+    idx = feat_df.level.isin(levels)
+    drop_cols = set(feat_df.columns).difference(feat_types + demo_cols)
+
+    feat_df = feat_df.loc[idx].drop(columns=drop_cols)
+    # normed_features_df = normed_features_df.drop(columns=drop_cols)
+
+    p_df = compute_percentiles(
+        feat_df,
+        features_loader,
+        feat_types,
+        filter_vo=True,
+        norm=norm,
+        fillna=np.inf,
+    )
+
+    out = {}
+
+    for lvl in levels:
+        out[lvl] = make_data_long(p_df, lvl)
+
+    return out
 
 
-def make_data_long(df, level, feat_types=cols, idx_on=["id", "group"]):
+def make_data_long(df, level, feat_types=feat_types, idx_on=["id", "group"]):
     stubs = ["feat_" + x for x in feat_types]
     stub_dict = dict(zip(feat_types, stubs))
     lvl_df = df.loc[df.level == level]
@@ -69,26 +70,21 @@ def make_data_long(df, level, feat_types=cols, idx_on=["id", "group"]):
 
 
 if __name__ == "__main__":
+    import argparse
 
-    save = True
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--outdir", default="data_intermediate")
+    parser.add_argument("--norm", action="store_true")
+    args = parser.parse_args()
 
-    long_dict = {}
-    norm_long_dict = {}
+    save_dir = Path(args.outdir)
+    suffix = "_normed" if args.norm else ""
 
-    for lvl in levels_shq:
-        long_dict[lvl] = make_data_long(clinical_percentiles_df, lvl)
-        norm_long_dict[lvl] = make_data_long(normed_percentiles_df, lvl)
+    long_dict = main(args.norm)
+    filename = save_dir / f"clinical-long-percentiles_three-levels{suffix}.pkl"
 
-    save_name = save_dir / "clinical-long-percentiles_three-levels.pkl"
-    normed_sname = save_dir / "normed-clinical-long-percentiles_three-levels.pkl"
-
-    if save:
-        with open(save_name, "wb") as f:
-            pickle.dump(long_dict, f)
-            print("\nSaved long data to: ", save_name)
-
-        with open(normed_sname, "wb") as f:
-            pickle.dump(norm_long_dict, f)
-            print("\nSaved long data to: ", normed_sname)
+    with open(filename, "wb") as f:
+        pickle.dump(long_dict, f)
+        print("\nSaved to: ", filename)
 
     print("\nDone!\n")

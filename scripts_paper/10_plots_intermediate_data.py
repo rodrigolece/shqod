@@ -12,8 +12,6 @@ from draw import cols, levels_shq
 
 
 data_dir = Path(os.environ["dementia"]) / "data"
-save_dir = Path("data_intermediate_modified")
-
 
 # The maps
 grid_dir = data_dir / "maps"
@@ -39,20 +37,17 @@ def roc_curves(norm, feat_types=cols):
 
     for lvl in levels_shq:
         df, idx = load_mixed_genders(level=lvl, norm=norm, feat_types=feat_types)
-        idx_na = df["dur"].notna()
-        df = df.loc[idx_na]
-        idx = idx[idx_na]
-        label = idx.astype(int).values
+        df["label"] = (~idx).astype(int)
+        df = df.dropna(subset=feat_types)
 
         for feat in feat_types:
-            # roc definition has incorrect group (voc-0) first, hence minus sign
-            score = -df[feat].values
+            score = df[feat].values
 
-            fpr, tpr, _ = metrics.roc_curve(label, score)  # 3rd argument is thresholds
+            fpr, tpr, _ = metrics.roc_curve(df["label"], score)  # 3rd argument is thresholds
             roc_xy_dict[(lvl, feat)] = (fpr, tpr)
 
-            # auc = metrics.roc_auc_score(label, score)
-            # auc_delong, variance = delong_roc_variance(label, score)
+            # auc = metrics.roc_auc_score(df["label"], score)
+            # auc_delong, variance = delong_roc_variance(df["label"], score)
             # auc_dict[(lvl, feat)] = (auc, auc_delong, variance)
 
     return roc_xy_dict
@@ -63,9 +58,8 @@ def aucs(norm, feat_types=cols):
 
     for lvl in levels_shq:
         df, idx = load_mixed_genders(level=lvl, norm=norm, feat_types=feat_types)
-        idx = vo_correctness(df.vo, lvl)
         df["label"] = (~idx).astype(int)
-        df = df.dropna()
+        df = df.dropna(subset=feat_types)
 
         auc = compute_auc(df, feat_types).reset_index()
         auc["level"] = lvl
@@ -79,7 +73,6 @@ def pvalues(norm, feat_types=cols):
 
     for lvl in levels_shq:
         df, idx = load_mixed_genders(level=lvl, norm=norm, feat_types=feat_types)
-        idx = vo_correctness(df.vo, lvl)
         df["label"] = (~idx).astype(int)
         df = df.dropna()
 
@@ -110,7 +103,10 @@ if __name__ == "__main__":
     norm = args.norm
     suffix = "_normed" if norm else ""
 
+
     save = True
+    save_dir = Path("data_intermediate_modified")
+
 
     # Level 6 for the feature separation depending on VO
     lvl = 6

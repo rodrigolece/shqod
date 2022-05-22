@@ -5,7 +5,8 @@ import pickle
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
-from draw import cols, set3_cycler, plot_roc_curves
+from draw import set3_cycler, plot_roc_curves
+from draw import cols as feat_types
 import plotutils as pu
 
 # set non-interactive backend
@@ -35,7 +36,7 @@ work_dir = Path(os.environ["dementia"]) / "code" / "shqod" / "scripts_paper"
 figures_dir = work_dir / "figures"
 
 
-def panels(filename, gp):
+def panels(filename, gp, feat_types=feat_types):
     assert gp in ("e3e4", "ad")
 
     with open(filename, "rb") as f:
@@ -53,7 +54,7 @@ def panels(filename, gp):
             ax = axes[i]
 
             leg = i == 0
-            plot_roc_curves(ax, roc_xy[gp], cols[i], legend=leg)
+            plot_roc_curves(ax, roc_xy[gp], feat_types[i], legend=leg)
 
             if i // 4 == 0:  # top row
                 plt.setp(ax.get_xticklabels(), visible=False)
@@ -76,22 +77,24 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("filename", help="input data")
+    parser.add_argument("input_dir")
+    parser.add_argument("--outdir", default="figures")
+    parser.add_argument("--norm", action="store_true")
     args = parser.parse_args()
 
-    save = False
+    input_dir = Path(args.input_dir)
+    figures_dir = Path(args.outdir)
+    suffix = "_normed" if args.norm else ""
 
-    # data_intermediate/roc-auc_boxplots.pkl
-    roc_filename = Path(args.filename)
-    assert roc_filename.is_file()
-    suffix = "_normed" if "normed" in str(roc_filename.name) else ""
+    filename = input_dir / f"roc-auc_boxplots{suffix}.pkl"
+    assert filename.is_file()
+    print("Loading data: ", filename)
 
     # The figures
     for gp in ["e3e4", "ad"]:
-        fig = panels(roc_filename, gp)
-        if save:
-            save_name = figures_dir / f"roc-boxplots_{gp[-2:]}{suffix}.pdf"
-            fig.savefig(save_name)
-            print("Saved to: ", save_name)
+        fig = panels(filename, gp)
+        save_name = figures_dir / f"roc-boxplots_{gp[-2:]}{suffix}.pdf"
+        fig.savefig(save_name)
+        print("Saved to: ", save_name)
 
     print("\nDone!\n")

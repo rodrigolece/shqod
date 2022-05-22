@@ -9,15 +9,10 @@ from sklearn import metrics
 import pyarrow.feather as feather
 
 from shqod import LevelsLoader, compute_percentiles, compute_auc
-from draw import cols, levels_shq
+from draw import cols as feat_types
 
 
 data_dir = Path(os.environ["dementia"]) / "data"
-save_dir = Path("data_intermediate")
-
-
-# The maps
-# grid_dir = data_dir / "maps"
 
 # Normative
 features_dir = data_dir / "normative" / "features"
@@ -25,31 +20,33 @@ features_loader = LevelsLoader(features_dir, fmt="feather")
 
 # Clinical
 clinical_dir = data_dir / "clinical"
-clinical_features_df = feather.read_feather(clinical_dir / "features.feather")
-normed_features_df = feather.read_feather(clinical_dir / "normed_features.feather")
+
+demo_cols = ["id", "group", "age", "gender", "level"]
 
 
-clinical_percentiles_df = compute_percentiles(
-    clinical_features_df,
-    features_loader,
-    cols,
-    filter_vo=True,
-    fillna=np.inf,
-)
+def percentiles(norm, levels=(6, 8, 11)):
+    preffix = "normed_" if norm else ""
+    filename = clinical_dir / f"{preffix}features.feather"
+    feat_df = feather.read_feather(filename)
 
-normed_percentiles_df = compute_percentiles(
-    normed_features_df,
-    features_loader,
-    cols,
-    filter_vo=True,
-    norm=True,
-    fillna=np.inf,
-)
+    idx = feat_df.level.isin(levels)
+    drop_cols = set(feat_df.columns).difference(feat_types + demo_cols)
+
+    feat_df = feat_df.loc[idx].drop(columns=drop_cols)
+
+    out = compute_percentiles(
+        feat_df,
+        features_loader,
+        feat_types,
+        filter_vo=True,
+        norm=norm,
+        fillna=np.inf,
+    )
+
+    return out
 
 
-def roc_curves(
-    df: pd.DataFrame, other: str, ref: str = "e3e3", feat_types: List[str] = cols
-):
+def roc_curves(df, other, ref="e3e3", feat_types=feat_types, levels=(6, 8, 11)):
     roc_xy_dict = {}
 
     for g in [ref, other]:
@@ -57,7 +54,7 @@ def roc_curves(
 
     idx_group = df.group.isin([ref, other])
 
-    for lvl in levels_shq:
+    for lvl in levels:
         lvl_df = df.loc[(df.level == lvl) & idx_group]
         label = lvl_df.group == other
 
@@ -72,7 +69,7 @@ def roc_curves(
     return roc_xy_dict
 
 
-def aucs(df, other, ref="e3e3", feat_types=cols):
+def aucs(df, other, ref="e3e3", feat_types=feat_types, levels=(6, 8, 11)):
     groups = df.loc[df.group.isin([ref, other])].copy()
     groups["label"] = (groups["group"] == other).astype(int)
 
@@ -80,7 +77,7 @@ def aucs(df, other, ref="e3e3", feat_types=cols):
 
     out = []
 
-    for lvl in levels_shq:
+    for lvl in levels:
         lvl_df = gby.get_group(lvl).dropna(subset=feat_types)
 
         auc = compute_auc(lvl_df, feat_types).reset_index()
@@ -91,11 +88,19 @@ def aucs(df, other, ref="e3e3", feat_types=cols):
 
 
 if __name__ == "__main__":
+    import argparse
 
-    save = False
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--outdir", default="data_intermediate")
+    args = parser.parse_args()
+
+    save_dir = Path(args.outdir)
+
+    clinical_percentiles_df = percentiles(norm=True)
+    normed_percentiles_df = percentiles(norm=False)
+    dfs = [clinical_percentiles_df, normed_percentiles_df]
 
     filenames = ["roc-auc_boxplots.pkl", "roc-auc_boxplots_normed.pkl"]
-    dfs = [clinical_percentiles_df, normed_percentiles_df]
 
     for data, fname in zip(dfs, filenames):
         auc = {}
@@ -105,10 +110,9 @@ if __name__ == "__main__":
             roc_xy[gp] = roc_curves(data, gp, ref="e3e3")
             auc[gp] = aucs(data, gp, ref="e3e3")
 
-        if save:
-            filename = save_dir / fname
-            with open(filename, "wb") as f:
-                pickle.dump({"auc": auc, "roc_xy": roc_xy}, f)
-                print("\nSaved roc-auc data to: ", filename)
+        filename = save_dir / fname
+        with open(filename, "wb") as f:
+            pickle.dump({"auc": auc, "roc_xy": roc_xy}, f)
+            print("\nSaved roc-auc data to: ", filename)
 
     print("\nDone!\n")

@@ -5,7 +5,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from cycler import cycler
 
-from draw import levels_shq, boxplot
+from draw import boxplot
 import plotutils as pu
 
 # set non-interactive backend
@@ -37,7 +37,7 @@ work_dir = Path(os.environ["dementia"]) / "code" / "shqod" / "scripts_paper"
 figures_dir = work_dir / "figures"
 
 
-def main(boxplot_filename, groups):
+def main(boxplot_filename, groups, levels=(6, 8, 11)):
     fig = plt.figure(figsize=(7.0, 8.0))
 
     gs = fig.add_gridspec(
@@ -54,7 +54,7 @@ def main(boxplot_filename, groups):
         ax = fig.add_subplot(subplot_spec)
 
         leg = i == 0
-        boxplot(ax, boxplot_filename, levels_shq[i], legend=leg, groups=groups)
+        boxplot(ax, boxplot_filename, levels[i], legend=leg, groups=groups)
 
     pu.Background(visible=False)
 
@@ -65,26 +65,27 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("filename", help="input data")
+    parser.add_argument("input_dir")
+    parser.add_argument("--outdir", default="figures")
+    parser.add_argument("--norm", action="store_true")
     args = parser.parse_args()
 
-    save = True
+    input_dir = Path(args.input_dir)
+    figures_dir = Path(args.outdir)
+    suffix = "_normed" if args.norm else ""
 
-    # data_intermediate/clinical-long-percentiles_three-levels.pkl
-    boxplot_filename = Path(args.filename)
-    assert boxplot_filename.is_file()
-    preffix = "normed_" if "normed" in str(boxplot_filename.name) else ""
+    filename = input_dir / f"clinical-long-percentiles_three-levels{suffix}.pkl"
+    assert filename.is_file()
+    print("Loading data: ", filename)
 
     groups = ["e3e3", "e3e4", "ad"]
     # custom_cycler = cycler(color=[color_map[g] for g in groups])
     custom_cycler = cycler(color=["#00ABE8", "#FF7F0E", "#EB1928"])  # Uzu's edit
     plt.rcParams.update({"axes.prop_cycle": custom_cycler})
 
-    fig = main(boxplot_filename, groups)
-
-    if save:
-        filename = figures_dir / f"{preffix}panel_boxplot.pdf"
-        fig.savefig(filename)  # bbox_inches="tight"
-        print("Saved to: ", filename)
+    fig = main(filename, groups)
+    filename = figures_dir / f"panel_boxplot{suffix}.pdf"
+    fig.savefig(filename)
+    print("Saved to: ", filename)
 
     print("\nDone!\n")
